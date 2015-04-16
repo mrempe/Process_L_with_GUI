@@ -1,4 +1,4 @@
-function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_length,filename)
+function S=run_S_model(dataset,dt,S0,LA,UA,tw,tQ,tAR,td,window_length,makeplot,epoch_length,filename)
 
 %usage: S=run_S_model(dataset,S0,LA,UA,ti,td)
 % dataset contains 2 columns. sleep state in the
@@ -15,7 +15,11 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_le
 % UA: the value of the upper asymptote (found from
 %     make_frequency_plot.m)
 %
-% ti: the time constant for the increasing exponential
+% tw: the time constant for the increasing exponential for wake
+%
+% tQ: the time constant for the increasing (or decreasing) exponential for quiet wake
+%
+% tAR: the time constant for the increasing exponential for wake
 %
 % td: the time constant for the decreasing exponential
 %
@@ -48,8 +52,10 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_le
   end
 
  
-  exp_rise=exp(-dt/ti);  %compute these once to save time
-  exp_fall=exp(-dt/td);
+  exp_rise_wake=exp(-dt/tw);  %compute these once to save time
+  exp_quiet = exp(-dt/tQ);
+  exp_active_REM = exp(-dt/tAR);
+  exp_fall_SWS=exp(-dt/td);
 
 
 
@@ -74,14 +80,17 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_le
     
 
     for i=1:iters-1                 % 8640 10-second intervals=24 hours
-       %i 
-      if dataset(i,1)==0 || dataset(i,1)==2 %wake or REM
-	S(i+1)=UA-(UA-S(i))*exp_rise;
+      if dataset(i,1)==0   %wake 
+        S(i+1)=UA-(UA-S(i))*exp_rise_wake;
+      elseif dataset(i,1)==3 % Quiet Wake
+        S(i+1)=UA-(UA-S(i))*exp_quiet;
+      elseif dataset(i,1)==4 || dataset(i,1)==2
+        S(i+1)=UA-(UA-S(i))*exp_active_REM;
       elseif(dataset(i,1)==1) %sleep
-	S(i+1)=LA+(S(i)-LA)*exp_fall;
+       S(i+1)=LA+(S(i)-LA)*exp_fall_SWS;
       else
-	error('I found a sleepstate value that was not 0,1, or 2')
-      end
+        error('I found a sleepstate value that was not 0,1,2,3, or 4')
+      end 
     end
   
   
@@ -102,12 +111,16 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_le
   
     for i=1:size(dataset,1)-1
       %i 
-      if dataset(i,1)==0 || dataset(i,1)==2 %wake or REM
-	S(i+1)=UA-(UA-S(i))*exp_rise;
+      if dataset(i,1)==0   %wake 
+        S(i+1)=UA-(UA-S(i))*exp_rise_wake;
+      elseif dataset(i,1)==3 % Quiet Wake
+        S(i+1)=UA-(UA-S(i))*exp_quiet;
+      elseif dataset(i,1)==4 || dataset(i,1)==2
+        S(i+1)=UA-(UA-S(i))*exp_active_REM;
       elseif(dataset(i,1)==1) %sleep
-	S(i+1)=LA+(S(i)-LA)*exp_fall;
+       S(i+1)=LA+(S(i)-LA)*exp_fall_SWS;
       else
-	error('I found a sleepstate value that was not 0,1, or 2')
+        error('I found a sleepstate value that was not 0,1,2,3, or 4')
       end
     end
   
@@ -130,18 +143,22 @@ S = zeros(1,size(dataset,1)-(window_length*(60*60/epoch_length)));
   
  
     for i=1:size(dataset,1)-(window_length*(60*60/epoch_length)+1)
-      if dataset(i+(window_length/2)*(60*60/epoch_length),1)==0 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==2 %wake or REM
-        S(i+1)=UA(i)-(UA(i)-S(i))*exp(-dt/ti);
+      if dataset(i+(window_length/2)*(60*60/epoch_length),1)==0  %wake 
+        S(i+1)=UA(i)-(UA(i)-S(i))*exp_rise_wake;
         if S(i+1) > UA(i+1)
           S(i+1) = UA(i+1);
         end
+      elseif dataset(i+(window_length/2)*(60*60/epoch_length),1)==3  % quiet wake 
+        S(i+1)=UA(i)-(UA(i)-S(i))*exp_quiet;
+      elseif dataset(i+(window_length/2)*(60*60/epoch_length),1)==4 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==2  % active wake or REM 
+        S(i+1)=UA(i)-(UA(i)-S(i))*exp_active_REM;
       elseif(dataset(i+(window_length/2)*(60*60/epoch_length),1)==1) %sleep
-        S(i+1)=LA(i)+(S(i)-LA(i))*exp(-dt/td);
+        S(i+1)=LA(i)+(S(i)-LA(i))*exp_fall_SWS;
         if S(i+1) < LA(i+1)
           S(i+1) = LA(i+1);
         end
       else
-	error('I found a sleepstate value that was not 0,1, or 2')
+        error('I found a sleepstate value that was not 0,1,2,3 or 4')
       end
     end
   
