@@ -1,5 +1,6 @@
-function [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,TauW,TauAR,TauQ,TauD]=PROCESSLBATCHMODE(directory,signal,algorithm,keyword,restrict)
-% USAGE: [signal_data,state_data,residual,best_S,UppA,LowA,Timer,Taui,Taud] =PROCESSLBATCHMODE(directory,signal,algorithm)
+function [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,Taui,TauD]=PROCESSLBATCHMODE
+%
+% PREVIOUS USAGE: [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,Taui,Taud] =PROCESSLBATCHMODE(directory,signal,algorithm,keyword,restrict)
 %
 % INPUTS:
 % directory is where the data files are (include the entire directory. i.e. 'D:\mrempe\strain_study_data\BL\long_files\'
@@ -22,15 +23,13 @@ function [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,T
 %  
 % OUTPUTS:
 % signal_data: a cell array containing vectors of either delta power or lactate, one for each file in the directory
-% state_data: a cell array containing vectors of the sleep state (0,1, or 2) for each file in the directory
+% state_data: a cell array containing vectors of the sleep state (0,1,2,3,4) for each file in the directory
 % residual:   a vector containing a vector of mean sum of squares error between best fit and data for each file in the directory
 % best_S:  a cell array containing the best fit curve S, one for each file in the directory
 % UppA:    upper asymptote
 % LowA:    lower asymptote
-% TauW:    a vector of the rise time time constant (during wake), one value for each file in the directory
-% TauAR:   a vector of the rise time time constant (during active wake and REM), one value for each file in the directory
-% TauQ:    a vector of the fall (or rise) time constant (during quiet waking), one value for each file in the directory
-% Taud:    a vector of the fall time time constant, one value for each file in the directory
+% Taui:    a vector of the rise time time constant (during wake, REMS, or active wake), one value for each file in the directory
+% Taud:    a vector of the fall time time constant, (during SWS and quiet wake) one value for each file in the directory
 % 
 
 %profile -memory on
@@ -38,31 +37,78 @@ function [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,T
 addpath 'C:\Users\wisorlab\Documents\MATLAB\Brennecke\matlab-pipeline\Matlab\etc\matlab-utils\';  %where importdatafile.m XL.m and create_TimeStampMatrix_from_textdata.m live
 
 
+% Pop up a window 
+[files,directory] = uigetfile('Multiselect','on','D:\*.txt','Please Select .txt file(s)');  %last parameter sent to uigetfile ('*.edf*) specifies that only edf files will be displayed in the user interface.
+if ~iscell(files), files = {files}; end
 
-if nargin==3
-directory_plus_extension=strcat(directory,'*.txt');
-restrict = 'none';
-elseif nargin==4 
-  if  keyword ~= 'none' & keyword ~= 'None'
+
+
+prompt = {'Do you want to use EEG1, EEG2, or lactate?', ...
+'Do you want to use BruteForce or NelderMead?','Do you want to use only files specified with a keywork? (1 for yes, 0 for no)', ...
+'Do you want to restrict the data? (1 for yes, 0 for no)'};
+defaults = {'EEG2','NelderMead','0','0'}; 
+dlg_title = 'Input';
+inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
+
+
+signal=inputs{1};
+algorithm = inputs{2};
+use_keyword = str2double(inputs{3});
+do_restrict = str2double(inputs{4});
+
+
+% Handle the case where a keyword is given
+if use_keyword == 1
+  prompt2 = {'Which Keyword Shall I look for in the filenames of the files you wish to process?'};
+  defaults2 = {'AUTO'};
+  dlg_title2 = 'Keyword';
+  keyword_input = inputdlg(prompt2,dlg_title2,1,defaults2,'on');
+  keyword = keyword_input{1};
+else 
+  keyword = 'None';
+end
+
+% Handle the case where a restriction is given
+if do_restrict ==1
+  prompt3 = {'Please enter a start time in hours from the beginning of the recording', 'Ending time (in hours from beginning of recording)'};
+  defaults3 = {'14','20'};
+  dlg_title3 = 'How do you want to restrict the data? ';
+  restrict_input = inputdlg(prompt3,dlg_title3,1,defaults3,'on');
+  restrict = [str2double(restrict_input{1}) str2double(restict_input{2})];
+else
+   restrict = 'none';
+end 
+
+% Set up directory_plus_extension, based on whether a keyword was entered
+if keyword ~= 'None'
     directory_plus_extension = strcat(directory,'*',keyword,'.txt');
   else 
     directory_plus_extension = strcat(directory,'*.txt');
-  end
-  restrict = 'none';
-
-elseif nargin==5 
-  if keyword ~= 'none' & keyword ~= 'None'
-    directory_plus_extension=strcat(directory,'*',keyword,'.txt');
-  else
-  directory_plus_extension=strcat(directory,'*.txt');
-  end 
 end
+
+% if nargin==3
+% directory_plus_extension=strcat(directory,'*.txt');
+% restrict = 'none';
+% elseif nargin==4 
+%   if  keyword ~= 'none' & keyword ~= 'None'
+%     directory_plus_extension = strcat(directory,'*',keyword,'.txt');
+%   else 
+%     directory_plus_extension = strcat(directory,'*.txt');
+%   end
+%   restrict = 'none';
+
+% elseif nargin==5 
+%   if keyword ~= 'none' & keyword ~= 'None'
+%     directory_plus_extension=strcat(directory,'*',keyword,'.txt');
+%   else
+%   directory_plus_extension=strcat(directory,'*.txt');
+%   end 
+% end
 
 
 if ~strcmp(signal,'lactate') & ~strcmp(signal,'delta1') & ~strcmp(signal,'delta2') & ~strcmp(signal,'EEG1') & ~strcmp(signal,'EEG2')
   error('Input signal must be one of the following: ''lactate'', ''delta1'', ''delta2'', ''EEG1'', or ''EEG2''')
 end
-
 
 
 
@@ -186,7 +232,9 @@ window_length = 4;      % length of moving window used to compute UA and LA if s
     onetotwo(i)=~isempty(strfind(HeadChars(i,:),'1-2 '));
     EMG(i)=~isempty(strfind(HeadChars(i,:),'EMG'));
   end
-    
+  fclose('all');   %close all the files
+
+
   EEG1_1to2Hzcolumn = intersect(find(EEG1),find(onetotwo))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
   EEG2_1to2Hzcolumn = intersect(find(EEG2),find(onetotwo))-2;
   EMG_column = find(EMG)-2;
@@ -386,10 +434,10 @@ for FileCounter=1:length(files)
   disp(['File number ', num2str(FileCounter), ' of ', num2str(length(files))])
   display(files(FileCounter).name)
   if strcmp(algorithm,'NelderMead')  
-  [Tw,TQ,TAR,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],signal,files(FileCounter).name,epoch_length_in_seconds(FileCounter),window_length);
+  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],signal,files(FileCounter).name,epoch_length_in_seconds(FileCounter),window_length);
   end
   if strcmp(algorithm,'BruteForce')
-  [Tw,TQ,TAR,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],signal,files(FileCounter).name,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
+  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],signal,files(FileCounter).name,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
   end
 
 residual(FileCounter) = best_error;
@@ -397,10 +445,9 @@ residual(FileCounter) = best_error;
 %[LAnormalized,UAnormalized]=normalizeLAUA(LA,UA,[state_data{FileCounter} signal_data{FileCounter}],TimeStampMatrix{FileCounter});
 LAnormalized = LA;
 UAnormalized = UA;
-  TauAR(FileCounter) = TAR;
+  Taui(FileCounter) = Ti;
   TauD(FileCounter) = Td;
-  TauQ(FileCounter) = TQ;
-  TauW(FileCounter) = Tw;
+  
 
   LowA{FileCounter} = LAnormalized;  %normalized LA
   UppA{FileCounter} = UAnormalized;  %normalized UA
