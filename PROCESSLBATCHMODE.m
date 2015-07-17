@@ -34,6 +34,8 @@ function [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,T
 
 %profile -memory on
 
+model = '5state'
+
 addpath 'C:\Users\wisorlab\Documents\MATLAB\Brennecke\matlab-pipeline\Matlab\etc\matlab-utils\';  %where importdatafile.m XL.m and create_TimeStampMatrix_from_textdata.m live
 
 
@@ -113,7 +115,7 @@ end
 
 
 
-files = dir(directory_plus_extension);     % the dir function returns a cell array containing the name, date, bytes and date-as-number as a single array for each txt file in this directory.
+%files = dir(directory_plus_extension);     % the dir function returns a cell array containing the name, date, bytes and date-as-number as a single array for each txt file in this directory.
 
 % %%%%%%%%%%%%%%%%%%%%%%%%%
 % for i=length(files):-1:1                % don't include files that have already been autoscored
@@ -139,8 +141,10 @@ clear EEG1
 %clear dynamic_range
 %clear TimeStampMatrix   
 
-  [data,textdata]=importdatafile(files(FileCounter).name,directory);%importfile returns data (a matrix) and textdata (a cell array)
-  display(files(FileCounter).name) % One matrix (textdata) holds the date/time stamp and sleep state.  The other (data) holds the lactate and EEG data.
+  %[data,textdata]=importdatafile(files(FileCounter).name,directory);%importfile returns data (a matrix) and textdata (a cell array)
+  [data,textdata]=importdatafile(files{FileCounter},directory);%importfile returns data (a matrix) and textdata (a cell array)
+
+  display(files{FileCounter}) % One matrix (textdata) holds the date/time stamp and sleep state.  The other (data) holds the lactate and EEG data.
   
 
 % Compute the length of one epoch here using TimeStampMatrix
@@ -221,7 +225,7 @@ window_length = 4;      % length of moving window used to compute UA and LA if s
   end
   
   % Find the columns with EEG1 1-2 Hz and EEG2 1-2 Hz  
-  fid = fopen(strcat(directory,files(FileCounter).name));
+  fid = fopen(strcat(directory,files{FileCounter}));
   tLine1 = fgetl(fid);
   tLine2 = fgetl(fid);
   ColumnsHeads = textscan(tLine1,'%s','delimiter', sprintf('\t'));
@@ -432,12 +436,12 @@ end % end of looping through files to load data, decide which files to exclude, 
 disp('Starting computing loop...')
 for FileCounter=1:length(files)
   disp(['File number ', num2str(FileCounter), ' of ', num2str(length(files))])
-  display(files(FileCounter).name)
+  display(files{FileCounter})
   if strcmp(algorithm,'NelderMead')  
-  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],signal,files(FileCounter).name,epoch_length_in_seconds(FileCounter),window_length);
+  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
   end
   if strcmp(algorithm,'BruteForce')
-  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],signal,files(FileCounter).name,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
+  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
   end
 
 residual(FileCounter) = best_error;

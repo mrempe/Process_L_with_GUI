@@ -1,4 +1,4 @@
-function [Ti,Td,LA,UA,best_error,error_instant,best_S,ElapsedTime]=Franken_like_model_with_nelder_mead(datafile,signal,filename,epoch_length,window_length)
+function [Ti,Td,LA,UA,best_error,error_instant,best_S,ElapsedTime]=Franken_like_model_with_nelder_mead(datafile,signal,filename,model,epoch_length,window_length)
 % USAGE:  [Ti,Td,LA,UA,error]=Franken_like_model_with_nelder_mead(datafile,signal)
 %
 % datafile: a sleep data file from Jonathan Wisor where sleep
@@ -7,6 +7,8 @@ function [Ti,Td,LA,UA,best_error,error_instant,best_S,ElapsedTime]=Franken_like_
 % signal: 'delta1' or 'delta2' or 'EEG1' or 'EEG2' or 'lactate' 
 %
 % filename: the name of the .txt data file so I can use it in figure titles, etc.
+%
+% model: 5state or 3state depending on whether the model includes 3 states (W,SWS,REMS) or 5 (AW,QW,W,SWS,REMS)
 %
 % epoch_length: length of the epoch in seconds 
 %
@@ -94,12 +96,12 @@ initial_guess_lactate = [0.3 0.3];
 
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
   [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,t_mdpt_indices,data_at_SWS_midpoints, ...
-								datafile,dt,LA,UA,window_length,epoch_length,mask,p),initial_guess_delta,optimset('TolX',1e-3));
+								datafile,dt,LA,UA,model,window_length,epoch_length,mask,p),initial_guess_delta,optimset('TolX',1e-3));
 end
 
 if strcmp(signal,'lactate')
 [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,0,0,datafile,dt,LA,UA, ...
-								window_length,epoch_length,mask,p),initial_guess_lactate,optimset('TolX',1e-3));
+								model,window_length,epoch_length,mask,p),initial_guess_lactate,optimset('TolX',1e-3));
 end
 best_tau_i=bestparams(1);
 best_tau_d=bestparams(2);
@@ -110,12 +112,12 @@ Td=best_tau_d;
 
 % run one more time with best fit and plot it (add a plot with circles)
 if  strcmp(signal,'lactate')
-  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,epoch_length,filename);
+  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,model,Ti,Td,window_length,0,epoch_length,filename);
   %error_instant=run_instant_model(datafile,LA,UA,window_length);
 error_instant = 0;
 end
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
- best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,epoch_length,filename);
+ best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,model,Ti,Td,window_length,0,epoch_length,filename);
 end
 
 

@@ -1,4 +1,4 @@
-function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_length,filename)
+function S=run_S_model(dataset,dt,S0,LA,UA,model,ti,td,window_length,makeplot,epoch_length,filename)
 
 %usage: S=run_S_model(dataset,S0,LA,UA,ti,td)
 % dataset contains 2 columns. sleep state in the
@@ -14,6 +14,8 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_le
 %
 % UA: the value of the upper asymptote (found from
 %     make_frequency_plot.m)
+%
+% model: 5state or 3state depending on whether the model includes 3 states (W,SWS,REMS) or 5 (AW,QW,W,SWS,REMS)
 %
 % ti: the time constant for the increasing exponential for wake, active wake, and REM
 %
