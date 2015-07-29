@@ -1,4 +1,4 @@
-function [Ti,Td,LAnormalized,UAnormalized,best_error,error_instant,best_S,ElapsedTime]=Franken_like_model(datafile,signal,filename,epoch_length,window_length)
+function [Ti,Td,LA,UA,best_error,error_instant,best_S,ElapsedTime]=Franken_like_model(datafile,signal,filename,model,epoch_length,window_length)
 % USAGE:  [Ti,Td,error]=Franken_like_model(datafile,signal)
 %
 % datafile: a sleep data file from Jonathan Wisor where sleep
@@ -34,18 +34,18 @@ tic
 % -- all SWS episodes of longer than 5 minutes (like 
 % -- Franken et al)
 %if strcmp(signal,'delta1') || strcmp(signal,'delta2')
-  baseline_start_hours = 17;
-  baseline_end_hours = 21;
-  ind_start = baseline_start_hours*(60*60/epoch_length);
-  ind_end = baseline_end_hours*(60*60/epoch_length);
+  % baseline_start_hours = 17;
+  % baseline_end_hours = 21;
+  % ind_start = baseline_start_hours*(60*60/epoch_length);
+  % ind_end = baseline_end_hours*(60*60/epoch_length);
   
-  %[t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes2(datafile);
+  % %[t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes2(datafile);
 
-  locs = find(datafile(ind_start:ind_end,1)==1); % find SWS epochs in last 4 hr of baseline
-  mn   = mean(datafile(locs+ind_start-1,2));     % mean delta power during SWS in last 4hr of baseline
+  % locs = find(datafile(ind_start:ind_end,1)==1); % find SWS epochs in last 4 hr of baseline
+  % mn   = mean(datafile(locs+ind_start-1,2));     % mean delta power during SWS in last 4hr of baseline
 
-  LAnormalized = (LA/mn)*100;   % lower asymptote normalized to mean delta power during SWS in last 4hr of baseline
-  UAnormalized = (UA/mn)*100;   % upper asymptote normalized to mean delta power during SWS in last 4hr of baseline
+  % LAnormalized = (LA/mn)*100;   % lower asymptote normalized to mean delta power during SWS in last 4hr of baseline
+  % UAnormalized = (UA/mn)*100;   % upper asymptote normalized to mean delta power during SWS in last 4hr of baseline
 
 %end
 
@@ -55,6 +55,7 @@ tic
 % Franken et al)
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
   [t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes2(datafile,epoch_length);
+  disp(['Average delta power: ' num2str(mean(data_at_SWS_midpoints))])
 end
 
 % if using a moving window for the upper and lower assymptotes, S
@@ -117,48 +118,123 @@ error_instant = 0;
 end
 
 
-figure
+ElapsedTime=toc
+
+% plot the best fit
 t=0:dt:dt*(size(datafile,1)-1);
-if strcmp(signal,'delta1') | strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
-  plot(t_mdpt_SWS,data_at_SWS_midpoints,'ro')
+
+
+if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
+  error_instant=0;  % this won't get set if signal is delta, but the function returns it
+  figure
+  %only_sleep_indices=find(datafile(:,1)==1);  
+  %sleep_eeg1=datafile(only_sleep_indices,3);
+  %sleep_eeg2=datafile(only_sleep_indices,4);
+  %scatter(t(only_sleep_indices),sleep_eeg2,25,'r')
+  plot(t_mdpt_SWS,data_at_SWS_midpoints,'go')
   hold on
   plot(t,best_S)
   ylabel('Delta power')
-  title(['Best fit of model to delta power data for file ' filename])
-elseif strcmp(signal,'lactate')
-  plot(t,datafile(:,2),'ro')
-  hold on
-  tS=t((window_length/2)*(60*60/epoch_length)+1:end-(window_length/2)*(60*60/epoch_length));
-  plot(tS,best_S)
-  plot(tS,LA,'--')
-  plot(tS,UA,'--')
-  ylabel('lactate')
-  title('Best fit of model to lactate data')
-end
-xlabel('Time (hours)')
-hold off
-
-ElapsedTime=toc
-
-% hold on
-
-% if strcmp(signal,'delta') 
-%   plot(t_mdpt_SWS,data_at_SWS_midpoints,'ro')
-% ylabel('Delta power')
-% elseif strcmp(signal,'lactate')
-%   plot(t,datafile(:,2),'ro')
-% ylabel('lactate')
-% end
-
-% hold off
-% if strcmp(signal,'delta')
-%   title('Best fit of model to delta power data')
-% elseif strcmp(signal,'lactate')
-%   title('Best fit of model to lactate data')
-% end  
-% xlabel('Time (hours)')
+  xlabel('Time (hours)')
+  title(['Best fit of model to delta power data for file ' filename ' using ' num2str(epoch_length) '-second epochs and a ' model(1) '-state model' ])
+    hold off
 
 
+  elseif strcmp(signal,'lactate')
+    figure
+    %plot(t,datafile(:,2),'ro')
+    only_sleep_indices = find(datafile(:,1)==1);
+    only_wake_indices  = find(datafile(:,1)==0);
+    only_rem_indices   = find(datafile(:,1)==2);
+    sleep_lactate=datafile(only_sleep_indices,2);
+    wake_lactate=datafile(only_wake_indices,2);
+    rem_lactate=datafile(only_rem_indices,2);
+    
+   
+    scatter(t(only_wake_indices),wake_lactate,25,'r','filled')
+    hold on
+    scatter(t(only_sleep_indices),sleep_lactate,25,'k','filled')
+    scatter(t(only_rem_indices),rem_lactate,25,'g','filled')
+   
+
+    if strcmp(model,'5state')
+      only_quiet_wake_indices  = find(datafile(:,1)==3);
+      only_active_wake_indices = find(datafile(:,1)==4);
+      quiet_wake_lactate  = datafile(only_quiet_wake_indices,2);
+      active_wake_lactate = datafile(only_active_wake_indices,2);
+      scatter(t(only_quiet_wake_indices),quiet_wake_lactate,25,[1 0.5 0],'filled')  % orange
+      scatter(t(only_active_wake_indices),active_wake_lactate,25,[0.67 0.45 0.2],'filled') % brown
+    end
+    
+   %tS=t(361:end-(60*60/epoch_length));
+    tS=t((window_length/2)*(60*60/epoch_length)+1:end-(window_length/2)*(60*60/epoch_length));
+    
+    plot(tS,best_S,'b','LineWidth',1.5)
+    plot(tS,LA,'k--')
+    plot(tS,UA,'k--')
+    ylabel('lactate')
+    xlabel('Time (hours)')
+    title(['Best fit of model to lactate data for file ' filename 'using ' num2str(epoch_length) '-second epochs'])
+    hold off
+    
+    if strcmp(model,'3state')
+      legend('Wake','SWS','REMS','Model')
+    end
+
+    if strcmp(model,'5state')
+      legend('Wake','SWS','REMS','QW','AW','Model')
+    end
+    
+
+    figure
+    L_indices = (window_length/2)*(60*60/epoch_length)+1:length(t)-(window_length/2)*(60*60/epoch_length);
+    scaled_lactate_data = ((UA-LA)-(UA-datafile(L_indices,2)'))./(UA-LA);
+    only_sleep_indices_L = find(datafile(L_indices,1)==1);
+    only_wake_indices_L  = find(datafile(L_indices,1)==0);
+    only_rem_indices_L   = find(datafile(L_indices,1)==2);
+
+
+    sleep_lactate_scaled=scaled_lactate_data(only_sleep_indices_L);
+    wake_lactate_scaled=scaled_lactate_data(only_wake_indices_L);
+    rem_lactate_scaled=scaled_lactate_data(only_rem_indices_L);
+    scatter(tS(only_wake_indices_L),wake_lactate_scaled,25,'rd')
+    hold on
+    scatter(tS(only_sleep_indices_L),sleep_lactate_scaled,25,'b+')
+    scatter(tS(only_rem_indices_L),rem_lactate_scaled,25,'gx')
+
+  if strcmp(model,'5state')
+    only_quiet_wake_indices_L  = find(datafile(L_indices,1)==3);
+    only_active_wake_indices_L = find(datafile(L_indices,1)==4);
+    quiet_wake_lactate_scaled=scaled_lactate_data(only_quiet_wake_indices_L);
+    active_wake_lactate_scaled=scaled_lactate_data(only_active_wake_indices_L);
+    scatter(tS(only_active_wake_indices_L),active_wake_lactate_scaled,25,[0.67 0.45 0.2],'o')
+    scatter(tS(only_quiet_wake_indices_L),quiet_wake_lactate_scaled,25,[1 0.5 0],'s')
+  end
+
+
+
+    scaled_L = ((UA-LA)-(UA-best_S))./(UA-LA);
+    %plot(tS,scaled_lactate_data,'ro')
+    
+    plot(tS,scaled_L,'b','LineWidth',1.5)
+    hold off
+    ylabel('Lactate (scaled)')
+    xlabel('Time (hours)')
+    title(['Scaled lactate data for file ' filename 'using ' num2str(epoch_length) '-second epochs'])
+
+    if strcmp(model,'3state')
+      legend('Wake','SWS','REMS','Model')
+    end
+
+    if strcmp(model,'5state')
+      legend('Wake','SWS','REMS','QW','AW','Model')
+    end
+
+
+
+     best_S = scaled_L;   % Set best_S to the scaled lactate output so the function returns scaled_L
+
+  end
 
 % make a contour plot of the errors
 figure
@@ -166,5 +242,9 @@ figure
 contour(X,Y,error,100)
 ylabel('\tau_i')
 xlabel('\tau_d')
-%colorbar
+colorbar
+hold on
+plot(Td,Ti,'rx')
+hold off
+
 
