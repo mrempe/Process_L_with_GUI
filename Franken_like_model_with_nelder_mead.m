@@ -140,7 +140,7 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   plot(t,best_S)
   ylabel('Delta power')
   xlabel('Time (hours)')
-  title(['Best fit of model to delta power data for file ' filename ' using ' num2str(epoch_length) '-second epochs'])
+  title(['Best fit of model to delta power data for file ' filename ' using ' num2str(epoch_length) '-second epochs and a ' model(1) '-state model' ])
     hold off
 
 
@@ -181,6 +181,14 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     title(['Best fit of model to lactate data for file ' filename 'using ' num2str(epoch_length) '-second epochs'])
     hold off
     
+    if strcmp(model,'3state')
+      legend('Wake','SWS','REMS','Model')
+    end
+
+    if strcmp(model,'5state')
+      legend('Wake','SWS','REMS','QW','AW','Model')
+    end
+    
 
     figure
     L_indices = (window_length/2)*(60*60/epoch_length)+1:length(t)-(window_length/2)*(60*60/epoch_length);
@@ -217,6 +225,16 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     ylabel('Lactate (scaled)')
     xlabel('Time (hours)')
     title(['Scaled lactate data for file ' filename 'using ' num2str(epoch_length) '-second epochs'])
+
+    if strcmp(model,'3state')
+      legend('Wake','SWS','REMS','Model')
+    end
+
+    if strcmp(model,'5state')
+      legend('Wake','SWS','REMS','QW','AW','Model')
+    end
+
+
 
      best_S = scaled_L;   % Set best_S to the scaled lactate output so the function returns scaled_L
 

@@ -34,7 +34,7 @@ function [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,T
 
 %profile -memory on
 
-model = '5state'
+
 
 addpath 'C:\Users\wisorlab\Documents\MATLAB\Brennecke\matlab-pipeline\Matlab\etc\matlab-utils\';  %where importdatafile.m XL.m and create_TimeStampMatrix_from_textdata.m live
 
@@ -46,7 +46,7 @@ if ~iscell(files), files = {files}; end
 
 
 prompt = {'Do you want to use EEG1, EEG2, or lactate?', ...
-'Do you want to use BruteForce or NelderMead?','Do you want to use only files specified with a keywork? (1 for yes, 0 for no)', ...
+'Do you want to use BruteForce or NelderMead?','Do you want to rescore the data into Quiet Wake and Active Wake and use a 5-state model rather then a 3-state model?  (1 for yes, 0 for no)', ...
 'Do you want to restrict the data? (1 for yes, 0 for no)'};
 defaults = {'EEG2','NelderMead','0','0'}; 
 dlg_title = 'Input';
@@ -55,20 +55,27 @@ inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
 
 signal=inputs{1};
 algorithm = inputs{2};
-use_keyword = str2double(inputs{3});
+do_rescore = str2double(inputs{3});
 do_restrict = str2double(inputs{4});
 
-
-% Handle the case where a keyword is given
-if use_keyword == 1
-  prompt2 = {'Which Keyword Shall I look for in the filenames of the files you wish to process?'};
-  defaults2 = {'AUTO'};
-  dlg_title2 = 'Keyword';
-  keyword_input = inputdlg(prompt2,dlg_title2,1,defaults2,'on');
-  keyword = keyword_input{1};
-else 
-  keyword = 'None';
+if do_rescore == 1
+  model = '5state';
+elseif do_rescore == 0
+  model = '3state';
+else
+  error('You entered something other than 0 or 1 for rescoring into QW and AW')
 end
+
+% % Handle the case where a keyword is given
+% if use_keyword == 1
+%   prompt2 = {'Which Keyword Shall I look for in the filenames of the files you wish to process?'};
+%   defaults2 = {'AUTO'};
+%   dlg_title2 = 'Keyword';
+%   keyword_input = inputdlg(prompt2,dlg_title2,1,defaults2,'on');
+%   keyword = keyword_input{1};
+% else 
+%   keyword = 'None';
+% end
 
 % Handle the case where a restriction is given
 if do_restrict ==1
@@ -82,11 +89,11 @@ else
 end 
 
 % Set up directory_plus_extension, based on whether a keyword was entered
-if keyword ~= 'None'
-    directory_plus_extension = strcat(directory,'*',keyword,'.txt');
-  else 
-    directory_plus_extension = strcat(directory,'*.txt');
-end
+% if keyword ~= 'None'
+%     directory_plus_extension = strcat(directory,'*',keyword,'.txt');
+%   else 
+directory_plus_extension = strcat(directory,'*.txt');
+%end
 
 % if nargin==3
 % directory_plus_extension=strcat(directory,'*.txt');
