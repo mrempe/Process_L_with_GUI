@@ -1,4 +1,4 @@
-function [Ti,Td,LAnormalized,UAnormalized,best_error,error_instant,best_S,ElapsedTime]=Franken_like_model(datafile,signal,filename,model,epoch_length,window_length)
+function [Ti,Td,LAnormalized,UAnormalized,best_error,error_instant,best_S,ElapsedTime]=Franken_like_model(datafile,signal,filename,epoch_length,window_length)
 % USAGE:  [Ti,Td,error]=Franken_like_model(datafile,signal)
 %
 % datafile: a sleep data file from Jonathan Wisor where sleep
@@ -8,8 +8,6 @@ function [Ti,Td,LAnormalized,UAnormalized,best_error,error_instant,best_S,Elapse
 % signal: either 'delta' or 'lactate' 
 %
 % filename: the name of the .txt data file so I can use it in figure titles, etc.
-%
-% model: 5state or 3state depending on whether the model includes 3 states (W,SWS,REMS) or 5 (AW,QW,W,SWS,REMS)
 %
 % epoch_length: length of the epoch in seconds 
 %
@@ -86,7 +84,7 @@ error=zeros(length(tau_i),length(tau_d));
 for i=1:length(tau_i)
   for j=1:length(tau_d)
    
-    S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,model,tau_i(i),tau_d(j),window_length,0,epoch_length,filename); % run model
+    S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,tau_i(i),tau_d(j),window_length,0,epoch_length,filename); % run model
    
     % compute error (depending on if delta power or lactate was used)
     if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
@@ -108,13 +106,13 @@ Td=tau_d(c);
 
 % run one more time with best fit and plot it (add a plot with circles)
 if  strcmp(signal,'lactate')
-  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,model,tau_i(r),tau_d(c),window_length,1,epoch_length,filename);
+  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,tau_i(r),tau_d(c),window_length,1,epoch_length,filename);
 %error_instant=run_instant_model(datafile,LA,UA,window_length);
   error_instant = 0;
 end
 
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
-  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,model,Ti,Td,window_length,0,epoch_length,filename);
+  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,epoch_length,filename);
 error_instant = 0;
 end
 

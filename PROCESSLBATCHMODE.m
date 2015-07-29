@@ -274,14 +274,15 @@ EMG_data = data(:,EMG_column);
     PhysioVars = handle_artefacts(PhysioVars);
   end 
 
-
+if strcmp(model,'5state')
   % re-score wake epochs into quiet wake vs. active wake, based on EMG. Wake=0,SWS=1,REM=2,quiet wake=3, active wake=4
   newstate = RescoreQuietVsActiveWake(PhysioVars(:,1),EMG_data,0.33,0.66,FileCounter,files);
-
-
-
-  %state_data{FileCounter} = PhysioVars(:,1);
   state_data{FileCounter} = newstate;
+end 
+
+if strcmp(model,'3state')
+  state_data{FileCounter} = PhysioVars(:,1);
+end
 
 
   if strcmp(signal,'lactate')

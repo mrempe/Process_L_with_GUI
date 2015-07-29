@@ -1,4 +1,4 @@
-function S=run_S_model(dataset,dt,S0,LA,UA,model,ti,td,window_length,makeplot,epoch_length,filename)
+function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_length,filename)
 
 %usage: S=run_S_model(dataset,S0,LA,UA,ti,td)
 % dataset contains 2 columns. sleep state in the
@@ -14,8 +14,6 @@ function S=run_S_model(dataset,dt,S0,LA,UA,model,ti,td,window_length,makeplot,ep
 %
 % UA: the value of the upper asymptote (found from
 %     make_frequency_plot.m)
-%
-% model: 5state or 3state depending on whether the model includes 3 states (W,SWS,REMS) or 5 (AW,QW,W,SWS,REMS)
 %
 % ti: the time constant for the increasing exponential for wake, active wake, and REM
 %
@@ -58,9 +56,9 @@ function S=run_S_model(dataset,dt,S0,LA,UA,model,ti,td,window_length,makeplot,ep
 
 % CASE 1: using delta power histogram to choose upper and lower
 % assymptotes for the model
-  if length(LA)==1
+if length(LA)==1
 
-% preallocate for speed
+  % preallocate for speed
   S=zeros(1,size(dataset,1));
 
     S(1)=S0;
@@ -74,7 +72,7 @@ function S=run_S_model(dataset,dt,S0,LA,UA,model,ti,td,window_length,makeplot,ep
       iters=size(dataset,1);
     end
     
-
+  
     for i=1:iters-1                 % 8640 10-second intervals=24 hours
       if dataset(i,1)==0 || dataset(i,1)==2 || dataset(i,1)==4 %wake, REMS, or active wake 
         S(i+1)=UA-(UA-S(i))*exp_rise;
@@ -85,7 +83,8 @@ function S=run_S_model(dataset,dt,S0,LA,UA,model,ti,td,window_length,makeplot,ep
       end 
     end
   
-  
+
+ 
   % Now start the simulation over, using the last value out of S to be the new 
   % starting value of S
     if size(dataset,1) >= 8640

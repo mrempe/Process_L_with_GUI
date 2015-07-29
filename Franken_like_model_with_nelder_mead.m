@@ -96,12 +96,12 @@ initial_guess_lactate = [0.3 0.3];
 
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
   [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,t_mdpt_indices,data_at_SWS_midpoints, ...
-								datafile,dt,LA,UA,model,window_length,epoch_length,mask,p),initial_guess_delta,optimset('TolX',1e-3));
+								datafile,dt,LA,UA,window_length,epoch_length,mask,p),initial_guess_delta,optimset('TolX',1e-3));
 end
 
 if strcmp(signal,'lactate')
 [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,0,0,datafile,dt,LA,UA, ...
-								model,window_length,epoch_length,mask,p),initial_guess_lactate,optimset('TolX',1e-3));
+								window_length,epoch_length,mask,p),initial_guess_lactate,optimset('TolX',1e-3));
 end
 best_tau_i=bestparams(1);
 best_tau_d=bestparams(2);
@@ -112,12 +112,12 @@ Td=best_tau_d;
 
 % run one more time with best fit and plot it (add a plot with circles)
 if  strcmp(signal,'lactate')
-  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,model,Ti,Td,window_length,0,epoch_length,filename);
+  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,epoch_length,filename);
   %error_instant=run_instant_model(datafile,LA,UA,window_length);
 error_instant = 0;
 end
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
- best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,model,Ti,Td,window_length,0,epoch_length,filename);
+ best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,epoch_length,filename);
 end
 
 
@@ -153,17 +153,27 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     sleep_lactate=datafile(only_sleep_indices,2);
     wake_lactate=datafile(only_wake_indices,2);
     rem_lactate=datafile(only_rem_indices,2);
-    scatter(t(only_wake_indices),wake_lactate,25,'r')
-      
+    
+   
+    scatter(t(only_wake_indices),wake_lactate,25,'r','filled')
     hold on
-    scatter(t(only_sleep_indices),sleep_lactate,25,'k')
-    scatter(t(only_rem_indices),rem_lactate,25,'c')
-      
+    scatter(t(only_sleep_indices),sleep_lactate,25,'k','filled')
+    scatter(t(only_rem_indices),rem_lactate,25,'g','filled')
+   
+
+    if strcmp(model,'5state')
+      only_quiet_wake_indices  = find(datafile(:,1)==3);
+      only_active_wake_indices = find(datafile(:,1)==4);
+      quiet_wake_lactate  = datafile(only_quiet_wake_indices,2);
+      active_wake_lactate = datafile(only_active_wake_indices,2);
+      scatter(t(only_quiet_wake_indices),quiet_wake_lactate,25,[1 0.5 0],'filled')  % orange
+      scatter(t(only_active_wake_indices),active_wake_lactate,25,[0.67 0.45 0.2],'filled') % brown
+    end
     
    %tS=t(361:end-(60*60/epoch_length));
     tS=t((window_length/2)*(60*60/epoch_length)+1:end-(window_length/2)*(60*60/epoch_length));
     
-    plot(tS,best_S,'b')
+    plot(tS,best_S,'b','LineWidth',1.5)
     plot(tS,LA,'k--')
     plot(tS,UA,'k--')
     ylabel('lactate')
@@ -183,16 +193,26 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     sleep_lactate_scaled=scaled_lactate_data(only_sleep_indices_L);
     wake_lactate_scaled=scaled_lactate_data(only_wake_indices_L);
     rem_lactate_scaled=scaled_lactate_data(only_rem_indices_L);
-    scatter(tS(only_wake_indices_L),wake_lactate_scaled,25,'r')
+    scatter(tS(only_wake_indices_L),wake_lactate_scaled,25,'rd')
     hold on
-    scatter(tS(only_sleep_indices_L),sleep_lactate_scaled,25,'k')
-    scatter(tS(only_rem_indices_L),rem_lactate_scaled,25,'c')
+    scatter(tS(only_sleep_indices_L),sleep_lactate_scaled,25,'b+')
+    scatter(tS(only_rem_indices_L),rem_lactate_scaled,25,'gx')
+
+  if strcmp(model,'5state')
+    only_quiet_wake_indices_L  = find(datafile(L_indices,1)==3);
+    only_active_wake_indices_L = find(datafile(L_indices,1)==4);
+    quiet_wake_lactate_scaled=scaled_lactate_data(only_quiet_wake_indices_L);
+    active_wake_lactate_scaled=scaled_lactate_data(only_active_wake_indices_L);
+    scatter(tS(only_active_wake_indices_L),active_wake_lactate_scaled,25,[0.67 0.45 0.2],'o')
+    scatter(tS(only_quiet_wake_indices_L),quiet_wake_lactate_scaled,25,[1 0.5 0],'s')
+  end
+
 
 
     scaled_L = ((UA-LA)-(UA-best_S))./(UA-LA);
     %plot(tS,scaled_lactate_data,'ro')
     
-    plot(tS,scaled_L,'b')
+    plot(tS,scaled_L,'b','LineWidth',1.5)
     hold off
     ylabel('Lactate (scaled)')
     xlabel('Time (hours)')
