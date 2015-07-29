@@ -47,8 +47,8 @@ if ~iscell(files), files = {files}; end
 
 prompt = {'Do you want to use EEG1, EEG2, or lactate?', ...
 'Do you want to use BruteForce or NelderMead?','Do you want to rescore the data into Quiet Wake and Active Wake and use a 5-state model rather than a 3-state model?  (1 for yes, 0 for no)', ...
-'Do you want to restrict the data? (1 for yes, 0 for no)'};
-defaults = {'EEG2','NelderMead','0','0'}; 
+'Do you want to restrict the data? (1 for yes, 0 for no)','Would you like to write the optimal tau values to a file with a Data Source Info Tab? (1 for yes, 0 for no)'};
+defaults = {'EEG2','NelderMead','0','0','0'}; 
 dlg_title = 'Input';
 inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
 
@@ -57,6 +57,7 @@ signal=inputs{1};
 algorithm = inputs{2};
 do_rescore = str2double(inputs{3});
 do_restrict = str2double(inputs{4});
+do_write_tau_values_to_file = str2double(inputs{5});
 
 if do_rescore == 1
   model = '5state';
@@ -83,7 +84,7 @@ if do_restrict ==1
   defaults3 = {'14','20'};
   dlg_title3 = 'How do you want to restrict the data? ';
   restrict_input = inputdlg(prompt3,dlg_title3,1,defaults3,'on');
-  restrict = [str2double(restrict_input{1}) str2double(restict_input{2})];
+  restrict = [str2double(restrict_input{1}) str2double(restrict_input{2})];
 else
    restrict = 'none';
 end 
@@ -516,8 +517,22 @@ end  %end of looping through files
 %   title('Error between model fit and instant model that follows UA or LA')
 % end
 
+if do_write_tau_values_to_file
+  % set up directory for output files (if making them)
+  date_time = datestr(now,'mm.dd.yyyy.hh.MM');
+  output_directory = strcat(directory,'Tau_values_output_',date_time);
+  mkdir(output_directory)
+
+  write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict,restrict,Taui,TauD)
+end
+
+
+
+
 load chirp % this assigns chirp to the variable y
 sound  (y)
+
+
 
 
 
