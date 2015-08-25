@@ -58,7 +58,7 @@ fclose(fid);
 
 % first find all locations where lactate < 0 and
 % remove them from data and textdata
-locations=find(data(:,1)<0);
-data(locations,:)=[];
-textdata(locations,:)=[];
+% locations=find(data(:,1)<0);			% this is done in PROCESSLBATCHMODE.m now. 
+% data(locations,:)=[];
+% textdata(locations,:)=[];
 

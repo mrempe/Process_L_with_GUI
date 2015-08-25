@@ -1,6 +1,6 @@
-function [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,Taui,TauD]=PROCESSLBATCHMODE
+function [signal_data,state_data,timestampvec,residual,best_S,UppA,LowA,dynamic_range,Timer,Taui,TauD]=PROCESSLBATCHMODE
 %
-% PREVIOUS USAGE: [signal_data,state_data,residual,best_S,UppA,LowA,dynamic_range,Timer,Taui,Taud] =PROCESSLBATCHMODE(directory,signal,algorithm,keyword,restrict)
+% PREVIOUS USAGE: [signal_data,state_data,timestampvec,residual,best_S,UppA,LowA,dynamic_range,Timer,Taui,Taud] =PROCESSLBATCHMODE(directory,signal,algorithm,keyword,restrict)
 %
 % INPUTS:
 % directory is where the data files are (include the entire directory. i.e. 'D:\mrempe\strain_study_data\BL\long_files\'
@@ -40,15 +40,17 @@ addpath 'C:\Users\wisorlab\Documents\MATLAB\Brennecke\matlab-pipeline\Matlab\etc
 
 
 % Pop up a window 
-[files,directory] = uigetfile('Multiselect','on','D:\*.txt','Please Select .txt file(s)');  %last parameter sent to uigetfile ('*.edf*) specifies that only edf files will be displayed in the user interface.
+[files,directory] = uigetfile('Multiselect','on','D:\*.txt','PROCESS_L   Please Select .txt file(s)');  %last parameter sent to uigetfile ('*.edf*) specifies that only edf files will be displayed in the user interface.
 if ~iscell(files), files = {files}; end
 
 
 
 prompt = {'Do you want to use EEG1, EEG2, or lactate?', ...
 'Do you want to use BruteForce or NelderMead?','Do you want to rescore the data into Quiet Wake and Active Wake and use a 5-state model rather than a 3-state model?  (1 for yes, 0 for no)', ...
-'Do you want to restrict the data? (1 for yes, 0 for no)','Would you like to write the optimal tau values to a file with a Data Source Info Tab? (1 for yes, 0 for no)'};
-defaults = {'EEG2','NelderMead','0','0','0'}; 
+'Do you want to restrict the data using hours from the beginning of the recording? (1 for yes, 0 for no)', ...
+'Do you want to restrict the data to be between two specific times? (1 for yes, 0 for no)', ...
+'Would you like to write the optimal tau values to a file with a Data Source Info Tab? (1 for yes, 0 for no)'};
+defaults = {'EEG2','NelderMead','0','0','0','0'}; 
 dlg_title = 'Input';
 inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
 
@@ -56,8 +58,9 @@ inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
 signal=inputs{1};
 algorithm = inputs{2};
 do_rescore = str2double(inputs{3});
-do_restrict = str2double(inputs{4});
-do_write_tau_values_to_file = str2double(inputs{5});
+do_restrict_hours_from_start = str2double(inputs{4});
+do_restrict_start_time_end_time = str2double(inputs{5});
+do_write_tau_values_to_file = str2double(inputs{6});
 
 if do_rescore == 1
   model = '5state';
@@ -78,16 +81,33 @@ end
 %   keyword = 'None';
 % end
 
-% Handle the case where a restriction is given
-if do_restrict ==1
+% Handle the case where a restriction is given in terms of hours from the beginning of recording.  
+if do_restrict_hours_from_start == 1
   prompt3 = {'Please enter a start time in hours from the beginning of the recording', 'Ending time (in hours from beginning of recording)'};
   defaults3 = {'14','20'};
   dlg_title3 = 'How do you want to restrict the data? ';
   restrict_input = inputdlg(prompt3,dlg_title3,1,defaults3,'on');
-  restrict = [str2double(restrict_input{1}) str2double(restrict_input{2})];
-else
-   restrict = 'none';
+  restrict_hours_from_start = [str2double(restrict_input{1}) str2double(restrict_input{2})];
+  else
+   restrict_hours_from_start = 'none';
 end 
+
+if do_restrict_start_time_end_time == 1
+  prompt4 = {'Start time in 17:00:00 format','Which occurence of this time do you want to use? (1,2, or first, second, etc.)', ...
+            'End time in 17:00:00 format','Which occurence of this time do you want to use? (1,2, or first, second, etc.)'};
+  defaults4 = {'17:00:00','1','17:00:00','2'};
+  dlg_title4 = 'How do you want to restrict the data? ';
+  restrict_input = inputdlg(prompt4,dlg_title4,1,defaults4)
+  restrict_start_clock_time = restrict_input{1};
+  restrict_end_clock_time   = restrict_input{3};
+  start_time_occurence = str2double(restrict_input{2});
+  end_time_occurence   = str2double(restrict_input{4});
+
+end
+
+
+SkipString='07:00:00'
+occurence = 2;  % start at the second occurance of SkipString
 
 % Set up directory_plus_extension, based on whether a keyword was entered
 % if keyword ~= 'None'
@@ -144,55 +164,83 @@ HowManyFiles = length(files) % Need to know the number of files to process.  Thi
 % I will use each data set or not
 % --- 
 for FileCounter=1:length(files)  %this loop imports the data files one-by-one and processes the data in them into output files.   
-clear PhysioVars EEG1 EEG2 EMG EMG_data
-clear EEG1
-%clear dynamic_range
-%clear TimeStampMatrix   
+  clear PhysioVars EEG1 EEG2 EMG EMG_data
+ 
+ 
 
   %[data,textdata]=importdatafile(files(FileCounter).name,directory);%importfile returns data (a matrix) and textdata (a cell array)
   [data,textdata]=importdatafile(files{FileCounter},directory);%importfile returns data (a matrix) and textdata (a cell array)
 
+  if ~isempty(strfind(SkipString,':'))
+    for i=1:length(textdata)
+      SkipString_occurence_vec{i} = strfind(char(textdata(i,1)),SkipString);
+    end
+    locs = ~cellfun('isempty',SkipString_occurence_vec);
+    StartLine(FileCounter) = max(find(locs,occurence));  
+  else
+    StartLine(FileCounter) = 1;
+  end
+
+
+
   display(files{FileCounter}) % One matrix (textdata) holds the date/time stamp and sleep state.  The other (data) holds the lactate and EEG data.
   
 
-% Compute the length of one epoch here using TimeStampMatrix
-% I used to just compute the difference in seconds between first time stamp and second,
-% but that was not robust enough since sometimes there is a change in minutes between those two timestamps
-% textdata has mm/dd/yyy,HH:MM:SS AM format, but may or may not include quotes or single quotes,
-% so to be more robust, find the second colon and use that to get the seconds field of the time stamp
-f=find(textdata{1,1}==':');   % Find all locations of the colon in the first time stamp
-first_colon_loc = f(1);   
-last_colon_loc = f(2);
-hour_first_time_stamp    = str2num(textdata{1,1}(first_colon_loc-2))*10+str2num(textdata{1,1}(first_colon_loc-1));  
-hour_second_time_stamp   = str2num(textdata{2,1}(first_colon_loc-2))*10+str2num(textdata{2,1}(first_colon_loc-1));  
-minute_first_time_stamp  = str2num(textdata{1,1}(first_colon_loc+1))*10+str2num(textdata{1,1}(first_colon_loc+2));
-minute_second_time_stamp = str2num(textdata{2,1}(first_colon_loc+1))*10+str2num(textdata{2,1}(first_colon_loc+2));
-second_first_time_stamp  = str2num(textdata{1,1}(last_colon_loc+1))*10+str2num(textdata{1,1}(last_colon_loc+2));
-second_second_time_stamp = str2num(textdata{2,1}(last_colon_loc+1))*10+str2num(textdata{2,1}(last_colon_loc+2));
+  % Compute the length of one epoch here using TimeStampMatrix
+  % I used to just compute the difference in seconds between first time stamp and second,
+  % but that was not robust enough since sometimes there is a change in minutes between those two timestamps
+  % textdata has mm/dd/yyy,HH:MM:SS AM format, but may or may not include quotes or single quotes,
+  % so to be more robust, find the second colon and use that to get the seconds field of the time stamp
+  c = find(textdata{1,1}==':');   % Find all locations of the colon in the first time stamp
+  s = find(textdata{1,1}=='/');
+  first_colon_loc  = c(1);   
+  second_colon_loc = c(2);
+  first_slash_loc  = s(1);
+  second_slash_loc = s(2);
+  hour_first_time_stamp    = str2num(textdata{1,1}(first_colon_loc-2:first_colon_loc-1));  
+  hour_second_time_stamp   = str2num(textdata{2,1}(first_colon_loc-2:first_colon_loc-1));
+  minute_first_time_stamp  = str2num(textdata{1,1}(first_colon_loc+1:first_colon_loc+2));
+  minute_second_time_stamp = str2num(textdata{2,1}(first_colon_loc+1:first_colon_loc+2));
+  second_first_time_stamp  = str2num(textdata{1,1}(second_colon_loc+1:second_colon_loc+2));
+  second_second_time_stamp = str2num(textdata{2,1}(second_colon_loc+1:second_colon_loc+2));
 
-epoch_length_in_seconds(FileCounter)=etime([2014 2 28 hour_second_time_stamp minute_second_time_stamp second_second_time_stamp],[2014 2 28 hour_first_time_stamp minute_first_time_stamp second_first_time_stamp]);
+  epoch_length_in_seconds(FileCounter)=etime([2000 2 28 hour_second_time_stamp minute_second_time_stamp second_second_time_stamp],[2000 2 28 hour_first_time_stamp minute_first_time_stamp second_first_time_stamp]);
 
-window_length = 4;      % length of moving window used to compute UA and LA if signal is lactate.  
+  % year
+  Y = 2000 + str2num(textdata{1,1}(second_slash_loc+3:second_slash_loc+4));
+  % month
+  M = str2num(textdata{1,1}(1:2));
+
+  for i=1:length(textdata)
+    D(i) = str2num(textdata{i,1}(first_slash_loc+1:first_slash_loc+2));
+    H(i) = str2num(textdata{i,1}(first_colon_loc-2:first_colon_loc-1)); %or try str2num(textdata{i,1}(first_colon_loc-2:first_colon_loc-1))
+    m(i) = str2num(textdata{i,1}(second_colon_loc-2:second_colon_loc-1));
+    s(i) = str2num(textdata{i,1}(second_colon_loc+1:second_colon_loc+2));
+  end
+
+  timestampvec{FileCounter} = datetime(Y,M,D,H,m,s);  % this is a datetime vector with all the timestamps in it. Use it to plot and drop elements from this vector where artifacts happen
+ 
+  window_length = 4;      % length of moving window used to compute UA and LA if signal is lactate.  
   if strcmp(signal,'lactate')      % cut off data if using lactate sensor, smooth lactate data
-    lactate_cutoff_time_hours=60;  % time in hours to cut off the lactate signal (lifetime of sensor)
-    lactate_cutoff_time_rows=lactate_cutoff_time_hours*60*60/epoch_length_in_seconds(FileCounter);
+    % lactate_cutoff_time_hours=60;  % time in hours to cut off the lactate signal (lifetime of sensor)
+    % lactate_cutoff_time_rows=lactate_cutoff_time_hours*60*60/epoch_length_in_seconds(FileCounter);
     
+    
+  
+
     if epoch_length_in_seconds >=10
-    LactateSmoothed=medianfiltervectorized(data(:,1),1);
-    %[numchanged,LactateSmoothed]=SmootheLactate(data(:,1));
-    %disp(['number of points smoothed:', num2str(numchanged)])
-    % figure
-    % plot(1:size(data(:,1),1),data(:,1),'r',1:size(data(:,1),1),LactateSmoothed,'b')
-  elseif epoch_length_in_seconds < 10
-    LactateSmoothed=medianfiltervectorized(data(:,1),2);
-  end
-
-
-
-   if size(data,1) > lactate_cutoff_time_rows
-      data=data(1:lactate_cutoff_time_rows,:);
+      %LactateSmoothed=medianfiltervectorized(data(:,1),1);
+      [numchanged,LactateSmoothed]=SmootheLactate(data(:,1));
+      %disp(['number of points smoothed:', num2str(numchanged)])
+      figure
+      plot(1:size(data(:,1),1),data(:,1),'r',1:size(data(:,1),1),LactateSmoothed,'b')
+    elseif epoch_length_in_seconds < 10
+      LactateSmoothed=medianfiltervectorized(data(:,1),2);
     end
-  end
+    % if size(data,1) > lactate_cutoff_time_rows  % uncomment if you want to restrict the recordings to 
+    %   data=data(1:lactate_cutoff_time_rows,:);
+    % end
+  end 
 
                                                        
  
@@ -251,11 +299,11 @@ window_length = 4;      % length of moving window used to compute UA and LA if s
   EEG2_1to2Hzcolumn = intersect(find(EEG2),find(onetotwo))-2;
   EMG_column = find(EMG)-2;
 
-PhysioVars(:,3) = sum(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
-PhysioVars(:,4) = sum(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);
+  PhysioVars(:,3) = mean(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
+  PhysioVars(:,4) = mean(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
 
-% EMG data 
-EMG_data = data(:,EMG_column);
+  % EMG data 
+  EMG_data = data(:,EMG_column);
 
 
 
@@ -282,15 +330,15 @@ EMG_data = data(:,EMG_column);
     PhysioVars = handle_artefacts(PhysioVars);
   end 
 
-if strcmp(model,'5state')
-  % re-score wake epochs into quiet wake vs. active wake, based on EMG. Wake=0,SWS=1,REM=2,quiet wake=3, active wake=4
-  newstate = RescoreQuietVsActiveWake(PhysioVars(:,1),EMG_data,0.33,0.66,FileCounter,files);
-  state_data{FileCounter} = newstate;
-end 
+  if strcmp(model,'5state')
+    % re-score wake epochs into quiet wake vs. active wake, based on EMG. Wake=0,SWS=1,REM=2,quiet wake=3, active wake=4
+    newstate = RescoreQuietVsActiveWake(PhysioVars(:,1),EMG_data,0.33,0.66,FileCounter,files);
+    state_data{FileCounter} = newstate;
+  end 
 
-if strcmp(model,'3state')
-  state_data{FileCounter} = PhysioVars(:,1);
-end
+  if strcmp(model,'3state')
+    state_data{FileCounter} = PhysioVars(:,1);
+  end
 
 
   if strcmp(signal,'lactate')
@@ -301,91 +349,118 @@ end
     signal_data{FileCounter} = PhysioVars(:,4);
   end
 
-% Compute the dynamic range for each data file (90th percentile - 10th percentile)
+
+% Remove all epochs of data where the lactate signal is negative (if using lactate as the signal)
+  if strcmp(signal,'lactate')
+    locations=find(data(:,1)<0);
+    data(locations,:)=[];
+    textdata(locations,:)=[];
+    timestampvec{FileCounter}(locations)=[];
+    signal_data{FileCounter}(locations)=[];
+    state_data{FileCounter}(locations)=[];
+  end
+
+
+  % Compute the dynamic range for each data file (90th percentile - 10th percentile)
   dynamic_range(FileCounter) = quantile(signal_data{FileCounter},.9)-quantile(signal_data{FileCounter},.1);
 
-% Restrict the recording to only baseline (10AM-10AM), sleep deprivation (10AM-4PM day 2) or recovery (4PM-end)  
-% first read in all the timestamp data into a matrix
-% size(textdata)
-% for i=1:length(textdata)
-%   TimeStampMatrix{FileCounter}(:,i) = sscanf(textdata{i,1},'%f:%f:%f');
-%   end
+  % Restrict the recording to only baseline (10AM-10AM), sleep deprivation (10AM-4PM day 2) or recovery (4PM-end)  
+  % first read in all the timestamp data into a matrix
+  % size(textdata)
+  % for i=1:length(textdata)
+  %   TimeStampMatrix{FileCounter}(:,i) = sscanf(textdata{i,1},'%f:%f:%f');
+  %   end
 
-TimeStampMatrix{FileCounter} = create_TimeStampMatrix_from_textdata(textdata);
+  %TimeStampMatrix{FileCounter} = create_TimeStampMatrix_from_textdata(textdata);
   
-% if restrict is not a string, but is a two-element vector [tstart tend] instead (where tstart and tend are hours 
-% from the beginning of the recording),
-% restrict the recording to be only from tstart to tend. 
- 
-
-if ~isstr(restrict) & numel(restrict)==2
-  dt = 1/(60*60/epoch_length_in_seconds(FileCounter));
-  t  = 0:dt:dt*(size(signal_data{FileCounter},1)-1);
-  if strcmp(signal,'lactate')             % include window_length/2 hours of data on either side 
-    if restrict(1)-(window_length)/2 > 0      % check lower edge
-      start_index = find(abs(t-(restrict(1)-(window_length/2)))<1e-12);
-    else
-      start_index = find(abs(t-restrict(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
+  % if restrict_hours_from_start is not a string, but is a two-element vector [tstart tend] instead (where tstart and tend are hours 
+  % from the beginning of the recording),
+  % restrict the recording to be only from tstart to tend. 
+  if ~ischar(restrict_hours_from_start) & numel(restrict_hours_from_start)==2
+    dt = 1/(60*60/epoch_length_in_seconds(FileCounter));
+    t  = 0:dt:dt*(size(signal_data{FileCounter},1)-1);
+    if strcmp(signal,'lactate')             % include window_length/2 hours of data on either side 
+      if restrict(1)-(window_length)/2 > 0      % check lower edge
+        start_index = find(abs(t-(restrict(1)-(window_length/2)))<1e-12);
+      else
+        start_index = find(abs(t-restrict(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
+      end
+      if restrict(2) + (window_length/2 > t(end))   % check upper edge
+        end_index = find(abs(t-(restrict(2)+(window_length/2)))<1e-12);
+      else
+        if restrict(2) > t(end)
+          end_index = length(t);
+        else 
+          end_index = find(abs(t-restrict(2))<1e-12);
+        end
+      end
     end
-    if restrict(2) + (window_length/2 > t(end))   % check upper edge
-      end_index = find(abs(t-(restrict(2)+(window_length/2)))<1e-12);
-    else
+    if ~strcmp(signal,'lactate')
+      start_index = find(abs(t-restrict(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
       if restrict(2) > t(end)
         end_index = length(t);
       else 
         end_index = find(abs(t-restrict(2))<1e-12);
       end
     end
+  else
+    start_index = 1;                                % If no restriction
+    end_index = size(signal_data{FileCounter},1);
   end
-  if ~strcmp(signal,'lactate')
-    start_index = find(abs(t-restrict(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
-    if restrict(2) > t(end)
-      end_index = length(t);
-    else 
-      end_index = find(abs(t-restrict(2))<1e-12);
-    end
+
+  % If restriction is given as a starting time/ending time plus occurences (1st, 2nd, etc.)
+  if do_restrict_start_time_end_time
+    for i=1:length(textdata)
+      start_string_occurence_vec{i} = strfind(char(textdata(i,1)),restrict_start_clock_time);
+      end_string_occurence_vec{i}   = strfind(char(textdata(i,1)),restrict_end_clock_time);
+    end 
+    locs_start  = ~cellfun('isempty',start_string_occurence_vec);
+    locs_end    = ~cellfun('isempty',end_string_occurence_vec);
+    start_index = max(find(locs_start,start_time_occurence)) 
+    end_index = max(find(locs_end,end_time_occurence))
   end
-end
-
-if strcmp(restrict,'baseline')
-  locs_of_start_times = find([TimeStampMatrix{FileCounter}(:).Hour]==10 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %10AM
-  start_index = locs_of_start_times(1);
-  end_index = locs_of_start_times(2);  %second instance of 10AM is 24 hours into recording
-end
-
-if strcmp(restrict,'SD')
-  locs_of_start_times = find([TimeStampMatrix{FileCounter}(:).Hour]==10 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %10AM
-  start_index = locs_of_start_times(2);
-  locs_of_end_times = find([TimeStampMatrix{FileCounter}(:).Hour]==16 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %4PM
-  end_index = locs_of_end_times(2); %second instance of 4PM.  First is during baseline
-end
-
-if strcmp(restrict,'recovery')
-  locs_of_start_times = find([TimeStampMatrix{FileCounter}(:).Hour]==16 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %4PM
-  start_index = locs_of_start_times(2);  %second instance of 4PM.  First is during baseline
-  end_index = size(signal_data,1);
-end
-
-if strcmp(restrict,'baseline') | strcmp(restrict,'SD') | strcmp(restrict,'recovery') | (~isstr(restrict) & numel(restrict)==2)
-  state_data{FileCounter}  = state_data{FileCounter}(start_index:end_index,1);  %reset state_data and signal_data cell arrays
-  signal_data{FileCounter} = signal_data{FileCounter}(start_index:end_index,1);
-  TimeStampMatrix{FileCounter} = TimeStampMatrix{FileCounter}(start_index:end_index);
-end 
-
-% Now restrict the data is restrict is
 
 
 
-% Cut off all data before 8:00PM 
- %  locs_of_start_times = find([TimeStampMatrix{FileCounter}(:).Hour]==20 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %the twenty is for 20:00, 8:00PM
- % start_index = locs_of_start_times(1);
+  % if strcmp(restrict,'baseline')
+  %   locs_of_start_times = find([TimeStampMatrix{FileCounter}(:).Hour]==10 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %10AM
+  %   start_index = locs_of_start_times(1);
+  %   end_index = locs_of_start_times(2);  %second instance of 10AM is 24 hours into recording
+  % end
+
+  % if strcmp(restrict,'SD')
+  %   locs_of_start_times = find([TimeStampMatrix{FileCounter}(:).Hour]==10 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %10AM
+  %   start_index = locs_of_start_times(2);
+  %   locs_of_end_times = find([TimeStampMatrix{FileCounter}(:).Hour]==16 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %4PM
+  %   end_index = locs_of_end_times(2); %second instance of 4PM.  First is during baseline
+  % end
+
+  % if strcmp(restrict,'recovery')
+  %   locs_of_start_times = find([TimeStampMatrix{FileCounter}(:).Hour]==16 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %4PM
+  %   start_index = locs_of_start_times(2);  %second instance of 4PM.  First is during baseline
+  %   end_index = size(signal_data,1);
+  % end
+
+  % if strcmp(restrict,'baseline') | strcmp(restrict,'SD') | strcmp(restrict,'recovery') | (~isstr(restrict) & numel(restrict)==2)
+  %   state_data{FileCounter}  = state_data{FileCounter}(start_index:end_index,1);  %reset state_data and signal_data cell arrays
+  %   signal_data{FileCounter} = signal_data{FileCounter}(start_index:end_index,1);
+  %   TimeStampMatrix{FileCounter} = TimeStampMatrix{FileCounter}(start_index:end_index);
+  % end 
+
+  % Now restrict the data if restrict is
+
+
+
+  % Cut off all data before 8:00PM 
+  %  locs_of_start_times = find([TimeStampMatrix{FileCounter}(:).Hour]==20 & [TimeStampMatrix{FileCounter}(:).Minute]==0 & [TimeStampMatrix{FileCounter}(:).Second]==0); %the twenty is for 20:00, 8:00PM
+  % start_index = locs_of_start_times(1);
 
  
-  % state_data{FileCounter}  = state_data{FileCounter}(start_index:end,1);  %reset state_data and signal_data cell arrays to only include the data starting at 8:00PM
-  % signal_data{FileCounter} = signal_data{FileCounter}(start_index:end,1);
-  % TimeStampMatrix{FileCounter} = TimeStampMatrix{FileCounter}(start_index:end);
-
-
+  state_data{FileCounter}  = state_data{FileCounter}(start_index:end_index,1);  %reset state_data and signal_data cell arrays to only include the data included in the restriction
+  signal_data{FileCounter} = signal_data{FileCounter}(start_index:end_index,1);
+  %TimeStampMatrix{FileCounter} = TimeStampMatrix{FileCounter}(start_index:end_index);
+  timestampvec{FileCounter} = timestampvec{FileCounter}(start_index:end_index);
+ 
   % compute the length of the datafile in hours 
   % start_time = TimeStampMatrix{FileCounter}(:,1);
   % end_time   = TimeStampMatrix{FileCounter}(:,end);
@@ -398,22 +473,17 @@ end
  
 
 
-% ----- 
-% For lactate simulations, allow the lactate sensor to settle down:
-% Find the first two NREM episodes of at least 1 minute, and start 
-% the simulation at the end of the second 1-minute NREM episode
-% ----
-if strcmp(signal,'lactate') & (strcmp(restrict,'none') || restrict(1)==0)
-   ind_of_second_NREM_episode_end = find_first_two_NREM_episodes(state_data{FileCounter});
-   state_data{FileCounter}  = state_data{FileCounter}(ind_of_second_NREM_episode_end:end);
-   signal_data{FileCounter} = signal_data{FileCounter}(ind_of_second_NREM_episode_end:end);
-end
-
-
-
-
-
-
+  % ----- 
+  % For lactate simulations, allow the lactate sensor to settle down:
+  % Find the first two NREM episodes of at least 1 minute, and start 
+  % the simulation at the end of the second 1-minute NREM episode
+  % ----
+  if strcmp(signal,'lactate') & (strcmp(restrict_hours_from_start,'none') || restrict_hours_from_start(1)==0)
+    ind_of_second_NREM_episode_end = find_first_two_NREM_episodes(state_data{FileCounter});
+    state_data{FileCounter}  = state_data{FileCounter}(ind_of_second_NREM_episode_end:end);
+    signal_data{FileCounter} = signal_data{FileCounter}(ind_of_second_NREM_episode_end:end);
+    timestampvec{FileCounter}= timestampvec{FileCounter}(ind_of_second_NREM_episode_end:end);
+  end
 end % end of looping through files to load data, decide which files to exclude, and cut off lactate transient
 
 % ------
@@ -453,11 +523,11 @@ for FileCounter=1:length(files)
   [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
   end
 
-residual(FileCounter) = best_error;
+  residual(FileCounter) = best_error;
 
-%[LAnormalized,UAnormalized]=normalizeLAUA(LA,UA,[state_data{FileCounter} signal_data{FileCounter}],TimeStampMatrix{FileCounter});
-LAnormalized = LA;
-UAnormalized = UA;
+  %[LAnormalized,UAnormalized]=normalizeLAUA(LA,UA,[state_data{FileCounter} signal_data{FileCounter}],TimeStampMatrix{FileCounter});
+  LAnormalized = LA;
+  UAnormalized = UA;
   Taui(FileCounter) = Ti;
   TauD(FileCounter) = Td;
   
@@ -472,33 +542,8 @@ UAnormalized = UA;
   % populate cell array with S output
   best_S{FileCounter} = S;
 
- 
-
-end  %end of looping through files
+ end  %end of looping through files
     
-%write a DataSourceInfo tab
-% disp('Writing data to an Excel file...')
-% addpath ../../../../../Brennecke/matlab-pipeline/Matlab/etc/matlab-utils/;
-% xl=XL;
-% sheet = xl.Sheets.Item(1);
-
-% col1_name{1} = 'Taui Values';                                       % column headers
-% first_header_cells=xl.setCells(sheet,[1,1],col1_name,'false','true');
-% set(first_header_cells.Font, 'Bold', true)
-% col2_name{1} = 'Taud Values';
-% second_header_cells=xl.setCells(sheet,[2,1],col2_name,'false','true');
-% set(second_header_cells.Font, 'Bold', true)
-% col3_name{1} = 'CPU time';
-% third_header_cells=xl.setCells(sheet,[3,1],col3_name,'false','true');
-% set(third_header_cells.Font, 'Bold', true)
-
-
-% xl.setCells(sheet,[1,2],Taui','false','false');
-
-% xl.sourceInfo(mfilename('fullpath'));                                % DataSourceInfo tab
-% xl.saveAs(strcat('PROCESSLBATCHMODE output', '.txt'));
-
-
 
 % make a bar graph showing the error in the model and the error using 
 % the instant model that follows the lactate upper and lower bounds and 
@@ -523,7 +568,7 @@ if do_write_tau_values_to_file
   output_directory = strcat(directory,'Tau_values_output_',date_time);
   mkdir(output_directory)
 
-  write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict,restrict,Taui,TauD)
+  write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict,restrict_hours_from_start,Taui,TauD)
 end
 
 
