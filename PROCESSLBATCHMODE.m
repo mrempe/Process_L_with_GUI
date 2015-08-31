@@ -209,11 +209,12 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % year
   Y = 2000 + str2num(textdata{1,1}(second_slash_loc+3:second_slash_loc+4));
   % month
-  M = str2num(textdata{1,1}(1:2));
+  %M = str2num(textdata{1,1}(first_slash_loc-2:first_slash_loc-1));
 
   for i=1:length(textdata)
+    M(i) = str2num(textdata{i,1}(first_slash_loc-2:first_slash_loc-1));
     D(i) = str2num(textdata{i,1}(first_slash_loc+1:first_slash_loc+2));
-    H(i) = str2num(textdata{i,1}(first_colon_loc-2:first_colon_loc-1)); %or try str2num(textdata{i,1}(first_colon_loc-2:first_colon_loc-1))
+    H(i) = str2num(textdata{i,1}(first_colon_loc-2:first_colon_loc-1)); 
     m(i) = str2num(textdata{i,1}(second_colon_loc-2:second_colon_loc-1));
     s(i) = str2num(textdata{i,1}(second_colon_loc+1:second_colon_loc+2));
   end
@@ -229,8 +230,8 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   
 
     if epoch_length_in_seconds >=10
-      %LactateSmoothed=medianfiltervectorized(data(:,1),1);
-      [numchanged,LactateSmoothed]=SmootheLactate(data(:,1));
+      LactateSmoothed=medianfiltervectorized(data(:,1),1);
+      %[numchanged,LactateSmoothed]=SmootheLactate(data(:,1));
       %disp(['number of points smoothed:', num2str(numchanged)])
       figure
       plot(1:size(data(:,1),1),data(:,1),'r',1:size(data(:,1),1),LactateSmoothed,'b')
@@ -275,7 +276,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
  
 
   if strcmp(signal,'lactate') 
-    PhysioVars(:,2)=LactateSmoothed(1:size(data,1));
+    PhysioVars(:,2)=LactateSmoothed;
   disp(['Average lactate power: ' num2str(mean(PhysioVars(:,2)))])
   else PhysioVars(:,2)=data(:,1);
   end
@@ -517,10 +518,10 @@ for FileCounter=1:length(files)
   disp(['File number ', num2str(FileCounter), ' of ', num2str(length(files))])
   display(files{FileCounter})
   if strcmp(algorithm,'NelderMead')  
-  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
+  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
   end
   if strcmp(algorithm,'BruteForce')
-  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
+  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
   end
 
   residual(FileCounter) = best_error;
