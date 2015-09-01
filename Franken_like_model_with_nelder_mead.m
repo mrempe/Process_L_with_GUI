@@ -262,7 +262,7 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
 
      best_S = scaled_L;   % Set best_S to the scaled lactate output so the function returns scaled_L
 
-  end
+end
 
 % make a contour plot of the errors
 % figure

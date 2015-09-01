@@ -15,7 +15,7 @@ xl = XL;
 
 % open file dialog
 [files,path] = uigetfile({'*txt','Text Files (*.txt)';'*.*','All Files';},'Select Two Files to Concatenate','MultiSelect','On');
-if isstr(files), files = {files}; end
+if ischar(files), files = {files}; end
 
 % file name
 t1 = regexp(files{1},'(\w*)','match');
@@ -34,11 +34,11 @@ for i=1:length(files)
     if i==2 
     	% calculate the time difference between the two files (in seconds)
     	% and interpolate times between the two
-j 
-        tlast = regexp(lines{1,1}{1,1}{j},'(\d+/\d+/\d+)','match')
-        tstamp1 = regexp(lines{1,1}{1,1}{j},'(\d+):(\d+):(\d+)','tokens')
-        tstamp2 = regexp(lines{1,2}{1,1}{3},'(\d+):(\d+):(\d+)','tokens')
-        tstampprevious = regexp(lines{1,1}{1,1}{j-1},'(\d+):(\d+):(\d+)','tokens')
+
+        tlast = regexp(lines{1,1}{1,1}{j},'(\d+/\d+/\d+)','match');
+        tstamp1 = regexp(lines{1,1}{1,1}{j},'(\d+):(\d+):(\d+)','tokens');
+        tstamp2 = regexp(lines{1,2}{1,1}{3},'(\d+):(\d+):(\d+)','tokens');
+        tstampprevious = regexp(lines{1,1}{1,1}{j-1},'(\d+):(\d+):(\d+)','tokens');
         tsec = [str2num([tstamp1{1,1}{1};tstamp2{1,1}{1}])*60^2,str2num([tstamp1{1,1}{2};tstamp2{1,1}{2}])*60,str2num([tstamp1{1,1}{3};tstamp2{1,1}{3}])];
         tdelta = sum(tsec(2,:)-tsec(1,:)); % time gap that needs to be filled in (in seconds)
 

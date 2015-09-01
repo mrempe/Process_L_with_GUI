@@ -97,7 +97,7 @@ if do_restrict_start_time_end_time == 1
             'End time in 17:00:00 format','Which occurence of this time do you want to use? (1,2, or first, second, etc.)'};
   defaults4 = {'17:00:00','1','17:00:00','2'};
   dlg_title4 = 'How do you want to restrict the data? ';
-  restrict_input = inputdlg(prompt4,dlg_title4,1,defaults4)
+  restrict_input = inputdlg(prompt4,dlg_title4,1,defaults4);
   restrict_start_clock_time = restrict_input{1};
   restrict_end_clock_time   = restrict_input{3};
   start_time_occurence = str2double(restrict_input{2});
@@ -109,34 +109,9 @@ end
 SkipString='07:00:00'
 occurence = 2;  % start at the second occurance of SkipString
 
-% Set up directory_plus_extension, based on whether a keyword was entered
-% if keyword ~= 'None'
-%     directory_plus_extension = strcat(directory,'*',keyword,'.txt');
-%   else 
-directory_plus_extension = strcat(directory,'*.txt');
-%end
-
-% if nargin==3
-% directory_plus_extension=strcat(directory,'*.txt');
-% restrict = 'none';
-% elseif nargin==4 
-%   if  keyword ~= 'none' & keyword ~= 'None'
-%     directory_plus_extension = strcat(directory,'*',keyword,'.txt');
-%   else 
-%     directory_plus_extension = strcat(directory,'*.txt');
-%   end
-%   restrict = 'none';
-
-% elseif nargin==5 
-%   if keyword ~= 'none' & keyword ~= 'None'
-%     directory_plus_extension=strcat(directory,'*',keyword,'.txt');
-%   else
-%   directory_plus_extension=strcat(directory,'*.txt');
-%   end 
-% end
 
 
-if ~strcmp(signal,'lactate') & ~strcmp(signal,'delta1') & ~strcmp(signal,'delta2') & ~strcmp(signal,'EEG1') & ~strcmp(signal,'EEG2')
+if ~strcmp(signal,'lactate') && ~strcmp(signal,'delta1') && ~strcmp(signal,'delta2') && ~strcmp(signal,'EEG1') && ~strcmp(signal,'EEG2')
   error('Input signal must be one of the following: ''lactate'', ''delta1'', ''delta2'', ''EEG1'', or ''EEG2''')
 end
 
@@ -154,17 +129,22 @@ end
 % end
 %%%%%%%%%%%%%%%%%%%%%%%%%
 
-
-HowManyFiles = length(files) % Need to know the number of files to process.  This number is encoded as the variable "HowManyFiles". 
-
-
+% initialize cell arrays
+state_data  = cell(length(files),1);
+signal_data = cell(length(files),1);
+Taui = zeros(length(files),1);
+TauD = zeros(length(files),1);
+UppA = cell(length(files),1);
+LowA = cell(length(files),1);
+Timer  = zeros(length(files),1);
+best_S = cell(length(files),1);
 % ---
 % LOADING LOOP
 % First loop through the files, load all the data and decide if 
 % I will use each data set or not
 % --- 
 for FileCounter=1:length(files)  %this loop imports the data files one-by-one and processes the data in them into output files.   
-  clear PhysioVars EEG1 EEG2 EMG EMG_data
+  clear PhysioVars EEG1 EEG2 EMG EMG_data M D H m s StartLine
  
  
 
@@ -197,26 +177,26 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   second_colon_loc = c(2);
   first_slash_loc  = s(1);
   second_slash_loc = s(2);
-  hour_first_time_stamp    = str2num(textdata{1,1}(first_colon_loc-2:first_colon_loc-1));  
-  hour_second_time_stamp   = str2num(textdata{2,1}(first_colon_loc-2:first_colon_loc-1));
-  minute_first_time_stamp  = str2num(textdata{1,1}(first_colon_loc+1:first_colon_loc+2));
-  minute_second_time_stamp = str2num(textdata{2,1}(first_colon_loc+1:first_colon_loc+2));
-  second_first_time_stamp  = str2num(textdata{1,1}(second_colon_loc+1:second_colon_loc+2));
-  second_second_time_stamp = str2num(textdata{2,1}(second_colon_loc+1:second_colon_loc+2));
+  hour_first_time_stamp    = str2double(textdata{1,1}(first_colon_loc-2:first_colon_loc-1));  
+  hour_second_time_stamp   = str2double(textdata{2,1}(first_colon_loc-2:first_colon_loc-1));
+  minute_first_time_stamp  = str2double(textdata{1,1}(first_colon_loc+1:first_colon_loc+2));
+  minute_second_time_stamp = str2double(textdata{2,1}(first_colon_loc+1:first_colon_loc+2));
+  second_first_time_stamp  = str2double(textdata{1,1}(second_colon_loc+1:second_colon_loc+2));
+  second_second_time_stamp = str2double(textdata{2,1}(second_colon_loc+1:second_colon_loc+2));
 
   epoch_length_in_seconds(FileCounter)=etime([2000 2 28 hour_second_time_stamp minute_second_time_stamp second_second_time_stamp],[2000 2 28 hour_first_time_stamp minute_first_time_stamp second_first_time_stamp]);
 
   % year
-  Y = 2000 + str2num(textdata{1,1}(second_slash_loc+3:second_slash_loc+4));
+  Y = 2000 + str2double(textdata{1,1}(second_slash_loc+3:second_slash_loc+4));
   % month
   %M = str2num(textdata{1,1}(first_slash_loc-2:first_slash_loc-1));
 
   for i=1:length(textdata)
-    M(i) = str2num(textdata{i,1}(first_slash_loc-2:first_slash_loc-1));
-    D(i) = str2num(textdata{i,1}(first_slash_loc+1:first_slash_loc+2));
-    H(i) = str2num(textdata{i,1}(first_colon_loc-2:first_colon_loc-1)); 
-    m(i) = str2num(textdata{i,1}(second_colon_loc-2:second_colon_loc-1));
-    s(i) = str2num(textdata{i,1}(second_colon_loc+1:second_colon_loc+2));
+    M(i) = str2double(textdata{i,1}(first_slash_loc-2:first_slash_loc-1));
+    D(i) = str2double(textdata{i,1}(first_slash_loc+1:first_slash_loc+2));
+    H(i) = str2double(textdata{i,1}(first_colon_loc-2:first_colon_loc-1)); 
+    m(i) = str2double(textdata{i,1}(second_colon_loc-2:second_colon_loc-1));
+    s(i) = str2double(textdata{i,1}(second_colon_loc+1:second_colon_loc+2));
   end
 
   timestampvec{FileCounter} = datetime(Y,M,D,H,m,s);  % this is a datetime vector with all the timestamps in it. Use it to plot and drop elements from this vector where artifacts happen
@@ -284,7 +264,6 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % Find the columns with EEG1 1-2 Hz and EEG2 1-2 Hz  
   fid = fopen(strcat(directory,files{FileCounter}));
   tLine1 = fgetl(fid);
-  tLine2 = fgetl(fid);
   ColumnsHeads = textscan(tLine1,'%s','delimiter', sprintf('\t'));
   HeadChars=char(ColumnsHeads{1,1});
   for i=1:length(HeadChars)
@@ -344,9 +323,9 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
   if strcmp(signal,'lactate')
     signal_data{FileCounter} = PhysioVars(:,2);
-  elseif strcmp(signal,'delta1') | strcmp(signal,'EEG1')
+  elseif strcmp(signal,'delta1') || strcmp(signal,'EEG1')
     signal_data{FileCounter} = PhysioVars(:,3);
-  elseif strcmp(signal,'delta2') | strcmp(signal,'EEG2')
+  elseif strcmp(signal,'delta2') || strcmp(signal,'EEG2')
     signal_data{FileCounter} = PhysioVars(:,4);
   end
 
@@ -377,7 +356,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % if restrict_hours_from_start is not a string, but is a two-element vector [tstart tend] instead (where tstart and tend are hours 
   % from the beginning of the recording),
   % restrict the recording to be only from tstart to tend. 
-  if ~ischar(restrict_hours_from_start) & numel(restrict_hours_from_start)==2
+  if ~ischar(restrict_hours_from_start) && numel(restrict_hours_from_start)==2
     dt = 1/(60*60/epoch_length_in_seconds(FileCounter));
     t  = 0:dt:dt*(size(signal_data{FileCounter},1)-1);
     if strcmp(signal,'lactate')             % include window_length/2 hours of data on either side 
@@ -386,7 +365,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
       else
         start_index = find(abs(t-restrict(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
       end
-      if restrict(2) + (window_length/2 > t(end))   % check upper edge
+      if restrict(2) + (window_length)/2 > t(end)   % check upper edge
         end_index = find(abs(t-(restrict(2)+(window_length/2)))<1e-12);
       else
         if restrict(2) > t(end)
@@ -417,8 +396,8 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     end 
     locs_start  = ~cellfun('isempty',start_string_occurence_vec);
     locs_end    = ~cellfun('isempty',end_string_occurence_vec);
-    start_index = max(find(locs_start,start_time_occurence)) 
-    end_index = max(find(locs_end,end_time_occurence))
+    start_index = max(find(locs_start,start_time_occurence)); 
+    end_index = max(find(locs_end,end_time_occurence));
   end
 
 
@@ -479,7 +458,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % Find the first two NREM episodes of at least 1 minute, and start 
   % the simulation at the end of the second 1-minute NREM episode
   % ----
-  if strcmp(signal,'lactate') & (strcmp(restrict_hours_from_start,'none') || restrict_hours_from_start(1)==0)
+  if strcmp(signal,'lactate') && (strcmp(restrict_hours_from_start,'none') || restrict_hours_from_start(1)==0)
     ind_of_second_NREM_episode_end = find_first_two_NREM_episodes(state_data{FileCounter});
     state_data{FileCounter}  = state_data{FileCounter}(ind_of_second_NREM_episode_end:end);
     signal_data{FileCounter} = signal_data{FileCounter}(ind_of_second_NREM_episode_end:end);

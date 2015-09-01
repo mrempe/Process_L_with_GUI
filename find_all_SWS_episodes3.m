@@ -46,7 +46,6 @@ data=datafile(:,2);
 %t_mdpt_SWS=0;  % don't initialize this.  MATLAB will think it is a double, not a datetime object
 data_at_SWS_midpoints=0;
 %t_mdpt_indices=0;  % don't initialize this.  MATLAB will think it is a double, not a datetime object.
-counter=0;  % counter for number of SWS episodes longer than 5 min.
 starting_indices=0;
 
 % for each 5 min sliding window check to see if 90% or more is SWA
