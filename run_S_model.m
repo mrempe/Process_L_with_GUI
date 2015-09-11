@@ -1,4 +1,4 @@
-function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_length,filename)
+function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,timestampvec,tL,epoch_length,filename)
 
 %usage: S=run_S_model(dataset,S0,LA,UA,ti,td)
 % dataset contains 2 columns. sleep state in the
@@ -25,6 +25,11 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,epoch_le
 % moving window centered at each data point. 
 %
 % makeplot: 1 if you want to make a plot, 0 if you don't
+%
+% timestampvec: a datetime vector that contains the times at which we have data (lactate or delta).
+%
+% tL: a datetime vector that contains only those times at which the lactate model can be plotted since it uses a moving window for the lactate signal.
+%     this handles things like artifacts and letting the lactate sensor settle down.  
 % 
 % epoch_length: length of 1 epoch in seconds (typically 2,4,8, or 10)
 
@@ -119,28 +124,39 @@ if length(LA)==1
 % dataset(:,1). The moving window is 2 hours long, so an hour of
 % the data at the beginning is discarded, as well as an hour of
 % data at the end.  So S has length length(dataset(:,1))-720. 
+% UA(1) does not correspond to the beginning of the recording, 
+% but rather half of one window length into the recording.  
   elseif length(LA) ~=1
 
 %preallocate for speed
-
-S = zeros(1,size(dataset,1)-(window_length*(60*60/epoch_length)));
+%S = zeros(1,size(dataset,1)-(window_length*(60*60/epoch_length)));
+S = zeros(size(tL));
 
 % initialize S to lactate value 
-    S(1)=dataset((window_length/2)*(60*60/epoch_length),2); 
+    %S(1)=dataset((window_length/2)*(60*60/epoch_length),2) 
+S(1) = S0;
   
+% determine a way to index through the data excluding the half-windows at the beginning and the end
+l_start_index = find(timestampvec==tL(1));
+
  
-    for i=1:size(dataset,1)-(window_length*(60*60/epoch_length)+1)
-      if dataset(i+(window_length/2)*(60*60/epoch_length),1)==0 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==2 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==4    %wake,REMS, or active wake 
+    %for i=1:size(dataset,1)-(window_length*(60*60/epoch_length)+1)
+    for i=1:length(tL)-1
+      %if dataset(i+(window_length/2)*(60*60/epoch_length),1)==0 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==2 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==4    %wake,REMS, or active wake 
+      %UA_LA_index = find(timestampvec==tL(i));  % UA and LA are length of timestampvec, not tL.  
+      if dataset(l_start_index+i-1,1)==0 || dataset(l_start_index+i-1,1)==2 || dataset(l_start_index+i-1,1)==4  %wake, REMS, or active wake 
         S(i+1)=UA(i)-(UA(i)-S(i))*exp_rise;
-        if S(i+1) > UA(i+1)
-          S(i+1) = UA(i+1);
-        end
+        % if S(i+1) > UA(UA_LA_index+1)
+        %   S(i+1) = UA(UA_LA_index+1);
+        %end
       
-      elseif(dataset(i+(window_length/2)*(60*60/epoch_length),1)==1)  || dataset(i+(window_length/2)*(60*60/epoch_length),1)==3  %SWS or quiet wake
+      %elseif(dataset(i+(window_length/2)*(60*60/epoch_length),1)==1)  || dataset(i+(window_length/2)*(60*60/epoch_length),1)==3  %SWS or quiet wake
+      elseif dataset(l_start_index+i-1,1)==1  || dataset(l_start_index+i-1,1)==3  %SWS or quiet wake
+       
         S(i+1)=LA(i)+(S(i)-LA(i))*exp_fall;
-        if S(i+1) < LA(i+1)
-          S(i+1) = LA(i+1);
-        end
+        % if S(i+1) < LA(UA_LA_index+1)
+        %   S(i+1) = LA(UA_LA_index+1);
+        %end
       else
         error('I found a sleepstate value that was not 0,1,2,3 or 4')
       end
@@ -152,13 +168,13 @@ S = zeros(1,size(dataset,1)-(window_length*(60*60/epoch_length)));
   if makeplot==1
     
     figure
-    t=0:dt:dt*(size(dataset,1)-1);
-    tS=t((window_length/2)*(60*60/epoch_length)+1:end-(window_length/2)*(60*60/epoch_length));
+    %t=0:dt:dt*(size(dataset,1)-1);
+    %tS=t((window_length/2)*(60*60/epoch_length)+1:end-(window_length/2)*(60*60/epoch_length));
 
   
   
     if length(LA) ~= 1  
-      t=0:dt:dt*(size(dataset,1)-1);
+      %t=0:dt:dt*(size(dataset,1)-1);
       
       only_sleep_indices=find(dataset(:,1)==1);
       only_wake_indices=find(dataset(:,1)==0);
@@ -168,15 +184,15 @@ S = zeros(1,size(dataset,1)-(window_length*(60*60/epoch_length)));
       rem_lactate=dataset(only_rem_indices,2);
 
       sleep_state = dataset(:,1);
-      scatter(t(only_wake_indices),wake_lactate,25,'r')
+      scatter(timestampvec(only_wake_indices),wake_lactate,25,'r')
       
       hold on
-      scatter(t(only_sleep_indices),sleep_lactate,25,'k')
-      scatter(t(only_rem_indices),rem_lactate,25,'c')
-      plot(tS,S) 
+      scatter(timestampvec(only_sleep_indices),sleep_lactate,25,'k')
+      scatter(timestampvec(only_rem_indices),rem_lactate,25,'c')
+      plot(tL,S) 
       
     else 
-      plot(t,S)
+      plot(timestampvec,S)
     end
     title(['best fit for file ' filename])
       xlabel('TIME [h]')

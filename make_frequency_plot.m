@@ -1,13 +1,22 @@
-function [LA,UA,h]=make_frequency_plot(datafile,window_length,signal,epoch_length,makefig,newfig)
+function [LA,UA,h]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,makefig,newfig)
 % USAGE: [LA,UA]=make_frequency_plot(datafile,signal)
 %
 % this function reads in a sleep data file with two columns: sleep state, signal (delta or lactate)
 % given to me by J. Wisor 2011. 
 % signal is 'lactate' or 'delta'
-%
+% 
+% timestampvec: datetime vector with the epochs that correspond to all the data (delta or lactate),
+%               after removing artifacts and bad data.  
+% 
+% tL: datetime vector with the epochs that correspond to the lactate signal, after removing 
+%     the first window_length/2 and last window_length/2 due to the moving window averaging. 
+%     This was set up taking into account artifacts and so on. tL is used in this function 
+%     for plotting and for setting up UA and LA if the signal is lactate
 % optional argument is 1 if make the frequency histogram at all, newfig is if you
 % want the histogram in a new figure, if not, use the current figure. a new figure
-if nargin==4 makefig=0; newfig=0; end
+if nargin==5 makefig=0; newfig=0; end
+
+if nargin==6 newfig=0; end 
 %
 % window_length is the length (in hours) of the moving window used
 % in the calculation of UA and LA.
@@ -120,30 +129,78 @@ if strcmp(signal,'lactate') || strcmp(signal,'Lactate')
     axis([0 19.5 0 500]) 
   end
   
+  UA=zeros(1,length(tL));
+  LA=zeros(1,length(tL));
+
+  %l_start_index = find(timestampvec==tL(1))
   
-  shift=(window_length/2)*(60*60/epoch_length);
-  %for i=361:(length(data)-(60*60/epoch_length))
-  for i=shift+1:(length(data)-shift)
-       % if using lactate, the histograms for SWS and REM will overlap,
-    % so just use the 1st percentile for SWS
-    % LA(i-(60*60/epoch_length))=quantile(data(i-(60*60/epoch_length):i+(60*60/epoch_length)),.01);
-    % UA(i-(60*60/epoch_length))=quantile(data(i-(60*60/epoch_length):i+(60*60/epoch_length)),.99);
-       LA(i-shift)=quantile(data(i-shift:i+shift),.01);
-       UA(i-shift)=quantile(data(i-shift:i+shift),.99);
+  total_epochs_no_missing_data = seconds(timestampvec(end)-timestampvec(1))/epoch_length; %assuming no missing data
+  epochs_in_window = (window_length*60*60)/epoch_length;
+
+
+  % start_time=timestampvec(1);
+  % for i=1:total_epochs_no_missing_data-epochs_in_window+1
+  %   %start_time = timestampvec(i);
+  %   end_time = timestampvec(i)+hours(window_length);
+  %   indices_in_window = find(timestampvec>start_time & timestampvec<end_time);
+
+  %   LA(i) = quantile(data(indices_in_window),0.01);
+  %   UA(i) = quantile(data(indices_in_window),0.99);
+  
+  %   start_time = start_time + epoch_length;
+  % end
+
+% TRY AGAIN. UA and LA should be the same size as tL
+half_window = hours(window_length/2);
+start_times = tL-half_window;   % vectorized?
+end_times = tL+half_window;
+
+for i=1:length(tL)
+  %start_time = tL(i) - half_window;
+  %end_time   = tL(i) + half_window;
+  indices_in_window = find(timestampvec>=start_times(i) & timestampvec<=end_times(i));
+
+  LA(i) = quantile(data(indices_in_window),0.01);
+  UA(i) = quantile(data(indices_in_window),0.99);
+  
+end
+
+
+  % pause
+
+  % for i=1:length(tL)-1
+  % start_window_index = l_start_index+i-1-(epochs_in_window/2)
+  % end_window_index   = l_start_index+i-1+(epochs_in_window/2)
+
+  % LA(i) = quantile(data(start_window_index:end_window_index),0.01);
+  % UA(i) = quantile(data(start_window_index:end_window_index),0.99);
+
+  % end
+
+
+  % shift=(window_length/2)*(60*60/epoch_length);
+  % %for i=361:(length(data)-(60*60/epoch_length))
+  % for i=shift+1:(length(data)-shift)
+  %      % if using lactate, the histograms for SWS and REM will overlap,
+  %   % so just use the 1st percentile for SWS
+  %   % LA(i-(60*60/epoch_length))=quantile(data(i-(60*60/epoch_length):i+(60*60/epoch_length)),.01);
+  %   % UA(i-(60*60/epoch_length))=quantile(data(i-(60*60/epoch_length):i+(60*60/epoch_length)),.99);
+  %      LA(i-shift)=quantile(data(i-shift:i+shift),.01);
+  %      UA(i-shift)=quantile(data(i-shift:i+shift),.99);
     
     
-    if(animation)
-      xbins=linspace(0,max(data(i-shift:i+shift)),30);
-      [nall,xall]=hist(data(i-shift:i+shift),xbins);
-      set(h,'XData',xall,'YData',nall)
-      l1=line([LA(i-shift) LA(i-shift)],[0 max(nall)]);
-      l2=line([UA(i-shift) UA(i-shift)],[0 max(nall)]);
-      drawnow
-      delete(l1)
-      delete(l2)
-    end
+  %   if(animation)
+  %     xbins=linspace(0,max(data(i-shift:i+shift)),30);
+  %     [nall,xall]=hist(data(i-shift:i+shift),xbins);
+  %     set(h,'XData',xall,'YData',nall)
+  %     l1=line([LA(i-shift) LA(i-shift)],[0 max(nall)]);
+  %     l2=line([UA(i-shift) UA(i-shift)],[0 max(nall)]);
+  %     drawnow
+  %     delete(l1)
+  %     delete(l2)
+  %   end
     
-  end
+  % end
 h=gcf;
 end
 

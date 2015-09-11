@@ -43,10 +43,21 @@ tic
                   % the upper and lower asymptotes for the L model.  
 
 
+
+%% ---- Set up the time vector for lactate since you ignore data ------ %%
+%% ---- at the beginning and the end (due to the moving average) ------ %%
+% being careful to think about artifacts and allowing the sensor to settle down.  
+if strcmp(signal,'lactate')
+  tL_start_time  = timestampvec(1) + hours(window_length/2);
+  tL_end_time    = timestampvec(end) - hours(window_length/2);
+  tL_start_index = find(timestampvec==tL_start_time);
+  tL_end_index   = find(timestampvec==tL_end_time);
+  tL = timestampvec(tL_start_index:tL_end_index);
+end
 % make a frequency plot, and use it to figure out upper and lower
 % bounds for the model (like Franken et al. 2001 Figure 1)
 
-[LA,UA]=make_frequency_plot(datafile,window_length,signal,epoch_length);
+[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length);
 
 
 % -- if using delta power normalize UA and LA to mean SWS delta 
@@ -81,10 +92,13 @@ end
 
 
 
-mask=(window_length/2)*(60*60/epoch_length)+1:size(datafile,1)-(window_length/2)*(60*60/epoch_length);
+%mask=(window_length/2)*(60*60/epoch_length)+1:size(datafile,1)-(window_length/2)*(60*60/epoch_length);
+mask=find(timestampvec==tL(1)):find(timestampvec==tL(end));
 
-
-dt=1/(60*60/epoch_length);  % assuming  t is in hours 
+%dt=1/(60*60/epoch_length);  % assuming  t is in hours 
+dt=timestampvec(2:end)-timestampvec(1:end-1);
+dt=seconds(dt);  % convert dt into seconds
+dt=dt(1);        % only want one value, not a vector. Assume all epochs are the same length
 % tau_i=[0.05:0.01:1 1.1:.5:5];  %1:.12:25
 % tau_d=[0.05:0.01:1 1.1:.5:5]; %0.1:.025:5
 % error=zeros(length(tau_i),length(tau_d));
@@ -97,12 +111,21 @@ initial_guess_lactate = [0.3 0.3];
 
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
   [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,t_mdpt_indices,data_at_SWS_midpoints, ...
-								datafile,dt,LA,UA,window_length,epoch_length,mask,p),initial_guess_delta,optimset('TolX',1e-3));
+								datafile,dt,(LA(1)+UA(1))/2,LA,UA,window_length,timestampvec,0,epoch_length,mask,p),initial_guess_delta,optimset('TolX',1e-3));
 end
 
 if strcmp(signal,'lactate')
-[bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,0,0,datafile,dt,LA,UA, ...
-								window_length,epoch_length,mask,p),initial_guess_lactate,optimset('TolX',1e-3));
+% set up the time vector for lactate since you ignore data at the beginning and the end (due to the moving average)
+% being careful to think about artifacts and allowing the sensor to settle down.  
+  % tL_start_time  = timestampvec(1) + hours(window_length/2);
+  % tL_end_time    = timestampvec(end) - hours(window_length/2);
+  % tL_start_index = find(timestampvec==tL_start_time);
+  % tL_end_index   = find(timestampvec==tL_end_time);
+  % tL = timestampvec(tL_start_index:tL_end_index);
+  S_start_index = find(timestampvec==tL(1));
+  S0 = datafile(S_start_index,2);  % lactate data 
+  [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,0,0,datafile,dt,S0,LA,UA, ...
+								window_length,timestampvec,tL,epoch_length,mask,p),initial_guess_lactate,optimset('TolX',1e-3));
 end
 best_tau_i=bestparams(1);
 best_tau_d=bestparams(2);
@@ -113,12 +136,12 @@ Td=best_tau_d;
 
 % run one more time with best fit and plot it (add a plot with circles)
 if  strcmp(signal,'lactate')
-  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,epoch_length,filename);
+  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,timestampvec,tL,epoch_length,filename);
   %error_instant=run_instant_model(datafile,LA,UA,window_length);
 error_instant = 0;
 end
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
- best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,epoch_length,filename);
+ best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,timestampvec,tL,epoch_length,filename);
 end
 
 
@@ -185,18 +208,19 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     % since we're using a moving average of the lactate data
     %tS=t(361:end-(60*60/epoch_length));
     %tS=t((window_length/2)*(60*60/epoch_length)+1:end-(window_length/2)*(60*60/epoch_length));
-    tL_start_time  = timestampvec(1) + hours(window_length/2);
-    tL_end_time    = timestampvec(end) - hours(window_length/2);
-    tL_start_index = find(timestampvec==tL_start_time);
-    tL_end_index   = find(timestampvec==tL_end_time);
-    tL = timestampvec(tL_start_index:tL_end_index);
-
-
+    % tL_start_time  = timestampvec(1) + hours(window_length/2);
+    % tL_end_time    = timestampvec(end) - hours(window_length/2);
+    % tL_start_index = find(timestampvec==tL_start_time);
+    % tL_end_index   = find(timestampvec==tL_end_time);
+    % tL = timestampvec(tL_start_index:tL_end_index);
+    % timestampvec(end-10:end)
+    % length(best_S)
+    % length(tL)
     plot(tL,best_S,'b','LineWidth',1.5)
     plot(tL,LA,'k--')
     plot(tL,UA,'k--')
-    xmin = datenum(tL(1));
-    xmax = datenum(tL(end));
+    xmin = datenum(timestampvec(1));
+    xmax = datenum(timestampvec(end));
     xlim([xmin xmax])
     ylabel('lactate')
     xlabel('Time (hours)')
@@ -215,7 +239,9 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     
 
     figure
-    L_indices = (window_length/2)*(60*60/epoch_length)+1:length(t)-(window_length/2)*(60*60/epoch_length);
+    %L_indices = (window_length/2)*(60*60/epoch_length)+1:length(t)-(window_length/2)*(60*60/epoch_length);
+    L_indices = find(timestampvec>=tL(1) & timestampvec<=tL(end));
+    
     scaled_lactate_data = ((UA-LA)-(UA-datafile(L_indices,2)'))./(UA-LA);
     only_sleep_indices_L = find(datafile(L_indices,1)==1);
     only_wake_indices_L  = find(datafile(L_indices,1)==0);

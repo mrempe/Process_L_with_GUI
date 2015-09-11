@@ -32,7 +32,7 @@ function [signal_data,state_data,timestampvec,residual,best_S,UppA,LowA,dynamic_
 % Taud:    a vector of the fall time time constant, (during SWS and quiet wake) one value for each file in the directory
 % 
 
-%profile -memory on
+profile -memory on
 
 
 
@@ -40,7 +40,7 @@ addpath 'C:\Users\wisorlab\Documents\MATLAB\Brennecke\matlab-pipeline\Matlab\etc
 
 
 % Pop up a window 
-[files,directory] = uigetfile('Multiselect','on','D:\*.txt','PROCESS_L   Please Select .txt file(s)');  %last parameter sent to uigetfile ('*.edf*) specifies that only edf files will be displayed in the user interface.
+[files,directory] = uigetfile('Multiselect','on','\\FS1\WisorData\Rempe\Data\strain_study_data\*.txt','PROCESS_L   Please Select .txt file(s)');  %last parameter sent to uigetfile ('*.edf*) specifies that only edf files will be displayed in the user interface.
 if ~iscell(files), files = {files}; end
 
 
@@ -173,34 +173,43 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % so to be more robust, find the second colon and use that to get the seconds field of the time stamp
   c = find(textdata{1,1}==':');   % Find all locations of the colon in the first time stamp
   s = find(textdata{1,1}=='/');
-  first_colon_loc  = c(1);   
-  second_colon_loc = c(2);
-  first_slash_loc  = s(1);
-  second_slash_loc = s(2);
-  hour_first_time_stamp    = str2double(textdata{1,1}(first_colon_loc-2:first_colon_loc-1));  
-  hour_second_time_stamp   = str2double(textdata{2,1}(first_colon_loc-2:first_colon_loc-1));
-  minute_first_time_stamp  = str2double(textdata{1,1}(first_colon_loc+1:first_colon_loc+2));
-  minute_second_time_stamp = str2double(textdata{2,1}(first_colon_loc+1:first_colon_loc+2));
-  second_first_time_stamp  = str2double(textdata{1,1}(second_colon_loc+1:second_colon_loc+2));
-  second_second_time_stamp = str2double(textdata{2,1}(second_colon_loc+1:second_colon_loc+2));
+  for i=1:length(textdata)
+    c = find(textdata{i,1}==':');   % Find all locations of the colon in the ith time stamp
+    s = find(textdata{i,1}=='/');
+    first_colon_loc(i)  = c(1);   
+    second_colon_loc(i) = c(2);
+    first_slash_loc(i)  = s(1);
+    second_slash_loc(i) = s(2);
+  end 
+  hour_first_time_stamp    = str2double(textdata{1,1}(first_colon_loc(1)-2:first_colon_loc(1)-1));  
+  hour_second_time_stamp   = str2double(textdata{2,1}(first_colon_loc(1)-2:first_colon_loc(1)-1));
+  minute_first_time_stamp  = str2double(textdata{1,1}(first_colon_loc(1)+1:first_colon_loc(1)+2));
+  minute_second_time_stamp = str2double(textdata{2,1}(first_colon_loc(1)+1:first_colon_loc(1)+2));
+  second_first_time_stamp  = str2double(textdata{1,1}(second_colon_loc(1)+1:second_colon_loc(1)+2));
+  second_second_time_stamp = str2double(textdata{2,1}(second_colon_loc(1)+1:second_colon_loc(1)+2));
 
   epoch_length_in_seconds(FileCounter)=etime([2000 2 28 hour_second_time_stamp minute_second_time_stamp second_second_time_stamp],[2000 2 28 hour_first_time_stamp minute_first_time_stamp second_first_time_stamp]);
 
   % year
-  Y = 2000 + str2double(textdata{1,1}(second_slash_loc+3:second_slash_loc+4));
+  Y = 2000 + str2double(textdata{1,1}(second_slash_loc(1)+3:second_slash_loc(1)+4));
   % month
   %M = str2num(textdata{1,1}(first_slash_loc-2:first_slash_loc-1));
 
   for i=1:length(textdata)
-    M(i) = str2double(textdata{i,1}(first_slash_loc-2:first_slash_loc-1));
-    D(i) = str2double(textdata{i,1}(first_slash_loc+1:first_slash_loc+2));
-    H(i) = str2double(textdata{i,1}(first_colon_loc-2:first_colon_loc-1)); 
-    m(i) = str2double(textdata{i,1}(second_colon_loc-2:second_colon_loc-1));
-    s(i) = str2double(textdata{i,1}(second_colon_loc+1:second_colon_loc+2));
+    if isnan(str2double(textdata{i,1}(first_slash_loc(i)-2)))
+      M(i) = str2double(textdata{i,1}(first_slash_loc(i)-1));  % handle the case where month has only 1 digit, concat.m uses only one digit when interpolating
+    else 
+      M(i) = str2double(textdata{i,1}(first_slash_loc(i)-2:first_slash_loc(i)-1));
+    end 
+    D(i) = str2double(textdata{i,1}(first_slash_loc(i)+1:first_slash_loc(i)+2));
+    H(i) = str2double(textdata{i,1}(first_colon_loc(i)-2:first_colon_loc(i)-1)); 
+    m(i) = str2double(textdata{i,1}(second_colon_loc(i)-2:second_colon_loc(i)-1));
+    s(i) = str2double(textdata{i,1}(second_colon_loc(i)+1:second_colon_loc(i)+2));
   end
 
   timestampvec{FileCounter} = datetime(Y,M,D,H,m,s);  % this is a datetime vector with all the timestamps in it. Use it to plot and drop elements from this vector where artifacts happen
- 
+
+
   window_length = 4;      % length of moving window used to compute UA and LA if signal is lactate.  
   if strcmp(signal,'lactate')      % cut off data if using lactate sensor, smooth lactate data
     % lactate_cutoff_time_hours=60;  % time in hours to cut off the lactate signal (lifetime of sensor)
@@ -305,10 +314,10 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   
 
 
- % Handle artifacts 
-  if length(find(PhysioVars(:,1)==5)) > 0
-    PhysioVars = handle_artefacts(PhysioVars);
-  end 
+ % Handle artifacts (now I just remove these epochs from the simulations)
+  % if length(find(PhysioVars(:,1)==5)) > 0
+  %   PhysioVars = handle_artefacts(PhysioVars);
+  % end 
 
   if strcmp(model,'5state')
     % re-score wake epochs into quiet wake vs. active wake, based on EMG. Wake=0,SWS=1,REM=2,quiet wake=3, active wake=4
@@ -339,6 +348,14 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     signal_data{FileCounter}(locations)=[];
     state_data{FileCounter}(locations)=[];
   end
+
+  % Remove all epochs marked as artifact (X in txt file, 5 in PhysioVars)
+  locationsX=find(state_data{FileCounter}==5);
+  data(locationsX,:)=[];
+  textdata(locationsX,:)=[];
+  timestampvec{FileCounter}(locationsX)=[];
+  signal_data{FileCounter}(locationsX)=[];
+  state_data{FileCounter}(locationsX)=[];
 
 
   % Compute the dynamic range for each data file (90th percentile - 10th percentile)
@@ -497,10 +514,10 @@ for FileCounter=1:length(files)
   disp(['File number ', num2str(FileCounter), ' of ', num2str(length(files))])
   display(files{FileCounter})
   if strcmp(algorithm,'NelderMead')  
-  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
+    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
   end
   if strcmp(algorithm,'BruteForce')
-  [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
+    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
   end
 
   residual(FileCounter) = best_error;
@@ -561,4 +578,4 @@ sound  (y)
 
 
 
-%profile viewer
+profile viewer
