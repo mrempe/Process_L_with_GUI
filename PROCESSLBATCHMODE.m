@@ -32,7 +32,7 @@ function [signal_data,state_data,timestampvec,residual,best_S,UppA,LowA,dynamic_
 % Taud:    a vector of the fall time time constant, (during SWS and quiet wake) one value for each file in the directory
 % 
 
-profile -memory on
+%profile -memory on
 
 
 
@@ -288,8 +288,8 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   EEG2_1to2Hzcolumn = intersect(find(EEG2),find(onetotwo))-2;
   EMG_column = find(EMG)-2;
 
-  PhysioVars(:,3) = mean(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
-  PhysioVars(:,4) = mean(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
+  PhysioVars(:,3) = sum(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
+  PhysioVars(:,4) = sum(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
 
   % EMG data 
   EMG_data = data(:,EMG_column);
@@ -578,4 +578,4 @@ sound  (y)
 
 
 
-profile viewer
+%profile viewer

@@ -53,11 +53,13 @@ if strcmp(signal,'lactate')
   tL_start_index = find(timestampvec==tL_start_time);
   tL_end_index   = find(timestampvec==tL_end_time);
   tL = timestampvec(tL_start_index:tL_end_index);
+else 
+  tL =0;
 end
 % make a frequency plot, and use it to figure out upper and lower
 % bounds for the model (like Franken et al. 2001 Figure 1)
 
-[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length);
+[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,1,1);
 
 
 % -- if using delta power normalize UA and LA to mean SWS delta 
@@ -77,7 +79,7 @@ end
 
 
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
-  [t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes3(datafile,timestampvec,epoch_length);
+  [t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes5(datafile,timestampvec,epoch_length);
 disp(['Average delta power: ' num2str(mean(data_at_SWS_midpoints))])
 end
 
@@ -93,11 +95,15 @@ end
 
 
 %mask=(window_length/2)*(60*60/epoch_length)+1:size(datafile,1)-(window_length/2)*(60*60/epoch_length);
-mask=find(timestampvec==tL(1)):find(timestampvec==tL(end));
+if strcmp(signal,'lactate')
+  mask=find(timestampvec==tL(1)):find(timestampvec==tL(end));
+else
+  mask=0;
+end
 
 %dt=1/(60*60/epoch_length);  % assuming  t is in hours 
 dt=timestampvec(2:end)-timestampvec(1:end-1);
-dt=seconds(dt);  % convert dt into seconds
+dt=hours(dt);  % convert dt into hours to use in run_S_model
 dt=dt(1);        % only want one value, not a vector. Assume all epochs are the same length
 % tau_i=[0.05:0.01:1 1.1:.5:5];  %1:.12:25
 % tau_d=[0.05:0.01:1 1.1:.5:5]; %0.1:.025:5
@@ -149,7 +155,7 @@ ElapsedTime=toc
 
 
 % plot the best fit
-t=0:dt:dt*(size(datafile,1)-1);
+%t=0:dt:dt*(size(datafile,1)-1);
 
 
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
