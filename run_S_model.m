@@ -56,8 +56,8 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,timestam
   exp_rise=exp(-dt/ti);  %compute these once to save time
   exp_fall=exp(-dt/td);
 
-
-
+d=diff(timestampvec);   % array of time differences, so I know when an epoch has been dropped due to artifact
+d=hours(d);   % convert d to hours
 
 % CASE 1: using delta power histogram to choose upper and lower
 % assymptotes for the model
@@ -79,13 +79,17 @@ if length(LA)==1
     
   
     for i=1:iters-1                 % 8640 10-second intervals=24 hours
-      if dataset(i,1)==0 || dataset(i,1)==2 || dataset(i,1)==4 %wake, REMS, or active wake 
-        S(i+1)=UA-(UA-S(i))*exp_rise;
-      elseif dataset(i,1)==1 || dataset(i,1)==3 %SWS or quiet wake
-        S(i+1)=LA+(S(i)-LA)*exp_fall;
+      if d(i) ~= dt       % if there is missing data (artifact) don't update S for the next time step
+        S(i+1) = S(i);
       else
+        if dataset(i,1)==0 || dataset(i,1)==2 || dataset(i,1)==4 %wake, REMS, or active wake 
+          S(i+1)=UA-(UA-S(i))*exp_rise;
+        elseif dataset(i,1)==1 || dataset(i,1)==3 %SWS or quiet wake
+          S(i+1)=LA+(S(i)-LA)*exp_fall;
+        else
         error('I found a sleepstate value that was not 0,1,2,3, or 4')
-      end 
+        end 
+      end
     end
   
 
@@ -106,13 +110,16 @@ if length(LA)==1
   % [T,S]=ode45(@(t,S) homeostatode(t,S,issleep,ti,td,LA,UA),tspan,start_value); 
   
     for i=1:size(dataset,1)-1
-      %i 
-      if dataset(i,1)==0 || dataset(i,1)==2 || dataset(i,1)==4 %wake, REMS, or active wake 
-        S(i+1)=UA-(UA-S(i))*exp_rise;
-      elseif(dataset(i,1)==1) || dataset(i,1)==3 %SWS or quiet wake
-       S(i+1)=LA+(S(i)-LA)*exp_fall;
-      else
-        error('I found a sleepstate value that was not 0,1,2,3, or 4')
+      if d(i) ~= dt       % if there is missing data (artifact) don't update S for the next time step
+        S(i+1) = S(i);
+      else 
+        if dataset(i,1)==0 || dataset(i,1)==2 || dataset(i,1)==4 %wake, REMS, or active wake 
+          S(i+1)=UA-(UA-S(i))*exp_rise;
+        elseif(dataset(i,1)==1) || dataset(i,1)==3 %SWS or quiet wake
+        S(i+1)=LA+(S(i)-LA)*exp_fall;
+        else
+          error('I found a sleepstate value that was not 0,1,2,3, or 4')
+        end
       end
     end
   
@@ -126,7 +133,7 @@ if length(LA)==1
 % data at the end.  So S has length length(dataset(:,1))-720. 
 % UA(1) does not correspond to the beginning of the recording, 
 % but rather half of one window length into the recording.  
-  elseif length(LA) ~=1
+elseif length(LA) ~=1
 
 %preallocate for speed
 %S = zeros(1,size(dataset,1)-(window_length*(60*60/epoch_length)));
@@ -142,23 +149,27 @@ l_start_index = find(timestampvec==tL(1));
  
     %for i=1:size(dataset,1)-(window_length*(60*60/epoch_length)+1)
     for i=1:length(tL)-1
+      if d(i) ~= dt       % if there is missing data (artifact) don't update S for the next time step
+        S(i+1) = S(i);
+      else
       %if dataset(i+(window_length/2)*(60*60/epoch_length),1)==0 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==2 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==4    %wake,REMS, or active wake 
       %UA_LA_index = find(timestampvec==tL(i));  % UA and LA are length of timestampvec, not tL.  
-      if dataset(l_start_index+i-1,1)==0 || dataset(l_start_index+i-1,1)==2 || dataset(l_start_index+i-1,1)==4  %wake, REMS, or active wake 
-        S(i+1)=UA(i)-(UA(i)-S(i))*exp_rise;
+        if dataset(l_start_index+i-1,1)==0 || dataset(l_start_index+i-1,1)==2 || dataset(l_start_index+i-1,1)==4  %wake, REMS, or active wake 
+          S(i+1)=UA(i)-(UA(i)-S(i))*exp_rise;
         % if S(i+1) > UA(UA_LA_index+1)
         %   S(i+1) = UA(UA_LA_index+1);
         %end
       
       %elseif(dataset(i+(window_length/2)*(60*60/epoch_length),1)==1)  || dataset(i+(window_length/2)*(60*60/epoch_length),1)==3  %SWS or quiet wake
-      elseif dataset(l_start_index+i-1,1)==1  || dataset(l_start_index+i-1,1)==3  %SWS or quiet wake
+        elseif dataset(l_start_index+i-1,1)==1  || dataset(l_start_index+i-1,1)==3  %SWS or quiet wake
        
-        S(i+1)=LA(i)+(S(i)-LA(i))*exp_fall;
+          S(i+1)=LA(i)+(S(i)-LA(i))*exp_fall;
         % if S(i+1) < LA(UA_LA_index+1)
         %   S(i+1) = LA(UA_LA_index+1);
         %end
-      else
-        error('I found a sleepstate value that was not 0,1,2,3 or 4')
+        else
+          error('I found a sleepstate value that was not 0,1,2,3 or 4')
+        end
       end
     end
   

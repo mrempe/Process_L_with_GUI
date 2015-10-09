@@ -211,30 +211,26 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
 
   window_length = 4;      % length of moving window used to compute UA and LA if signal is lactate.  
-  if strcmp(signal,'lactate')      % cut off data if using lactate sensor, smooth lactate data
-    % lactate_cutoff_time_hours=60;  % time in hours to cut off the lactate signal (lifetime of sensor)
-    % lactate_cutoff_time_rows=lactate_cutoff_time_hours*60*60/epoch_length_in_seconds(FileCounter);
-    
-    
-  
-
-    if epoch_length_in_seconds >=10
-      LactateSmoothed=medianfiltervectorized(data(:,1),1);
-      %[numchanged,LactateSmoothed]=SmootheLactate(data(:,1));
-      %disp(['number of points smoothed:', num2str(numchanged)])
-      figure
-      plot(1:size(data(:,1),1),data(:,1),'r',1:size(data(:,1),1),LactateSmoothed,'b')
-    elseif epoch_length_in_seconds < 10
-      LactateSmoothed=medianfiltervectorized(data(:,1),2);
-    end
-    % if size(data,1) > lactate_cutoff_time_rows  % uncomment if you want to restrict the recordings to 
-    %   data=data(1:lactate_cutoff_time_rows,:);
-    % end
-  end 
+  % if strcmp(signal,'lactate')      % cut off data if using lactate sensor, smooth lactate data
+  %   % lactate_cutoff_time_hours=60;  % time in hours to cut off the lactate signal (lifetime of sensor)
+  %   % lactate_cutoff_time_rows=lactate_cutoff_time_hours*60*60/epoch_length_in_seconds(FileCounter);
+  %   if epoch_length_in_seconds >=10
+  %     LactateSmoothed=medianfiltervectorized(data(:,1),1);
+  %     %[numchanged,LactateSmoothed]=SmootheLactate(data(:,1));
+  %     %disp(['number of points smoothed:', num2str(numchanged)])
+  %     figure
+  %     plot(1:size(data(:,1),1),data(:,1),'r',1:size(data(:,1),1),LactateSmoothed,'b')
+  %   elseif epoch_length_in_seconds < 10
+  %     LactateSmoothed=medianfiltervectorized(data(:,1),2);
+  %   end
+  %   % if size(data,1) > lactate_cutoff_time_rows  % uncomment if you want to restrict the recordings to 
+  %   %   data=data(1:lactate_cutoff_time_rows,:);
+  %   % end
+  % end 
 
                                                        
  
-  PhysioVars=zeros(size(data,1),4);
+  PhysioVars=zeros(size(data,1),4);  % PhysioVars columns contain: SleepState, lactate, delta power in EEG1, delta power in EEG2 
  
 
   missing_values=0;
@@ -264,11 +260,11 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
  
 
-  if strcmp(signal,'lactate') 
-    PhysioVars(:,2)=LactateSmoothed;
-  disp(['Average lactate power: ' num2str(mean(PhysioVars(:,2)))])
-  else PhysioVars(:,2)=data(:,1);
-  end
+  % if strcmp(signal,'lactate') 
+  %   PhysioVars(:,2)=LactateSmoothed;
+  % disp(['Average lactate power: ' num2str(mean(PhysioVars(:,2)))])
+  % else PhysioVars(:,2)=data(:,1);
+  % end
   
   % Find the columns with EEG1 1-2 Hz and EEG2 1-2 Hz  
   fid = fopen(strcat(directory,files{FileCounter}));
@@ -288,8 +284,8 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   EEG2_1to2Hzcolumn = intersect(find(EEG2),find(onetotwo))-2;
   EMG_column = find(EMG)-2;
 
-  PhysioVars(:,3) = sum(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
-  PhysioVars(:,4) = sum(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
+  PhysioVars(:,3) = mean(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
+  PhysioVars(:,4) = mean(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
 
   % EMG data 
   EMG_data = data(:,EMG_column);
@@ -306,11 +302,11 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   %   PhysioVars(:,4) = mean(data(:,24:26),2); % EEG2 delta power (1-4Hz) if .txt file goes up to 20 Hz
   % end
 
-  d1smoothed = medianfiltervectorized(PhysioVars(:,3),2); 
-  d2smoothed = medianfiltervectorized(PhysioVars(:,4),2);
+  % d1smoothed = medianfiltervectorized(PhysioVars(:,3),2); 
+  % d2smoothed = medianfiltervectorized(PhysioVars(:,4),2);
   
-  PhysioVars(:,3) = d1smoothed;
-  PhysioVars(:,4) = d2smoothed;
+  % PhysioVars(:,3) = d1smoothed;
+  % PhysioVars(:,4) = d2smoothed;
   
 
 
@@ -318,6 +314,77 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % if length(find(PhysioVars(:,1)==5)) > 0
   %   PhysioVars = handle_artefacts(PhysioVars);
   % end 
+
+
+
+  % Remove all epochs marked as artifact (X in txt file, 5 in PhysioVars)
+  locationsX=find(PhysioVars(:,1)==5);
+  PhysioVars(locationsX,:)=[];
+  data(locationsX,:)=[];
+  textdata(locationsX,:)=[];
+  timestampvec{FileCounter}(locationsX)=[];
+  % signal_data{FileCounter}(locationsX)=[];
+  % state_data{FileCounter}(locationsX)=[];
+
+
+  % Exclude artifacts in EEG that were not marked as X, but where SWA is at least 10 SDs away from
+  % the mean for this animal.
+  sleep_epochs = find(PhysioVars(:,1)==1);
+  SWA1_during_sleep = PhysioVars(sleep_epochs,3);
+  SWA2_during_sleep = PhysioVars(sleep_epochs,4);
+  SWA1_outliers_indices = find(SWA1_during_sleep>=(mean(SWA1_during_sleep)+2*std(SWA1_during_sleep)));
+  SWA2_outliers_indices = find(SWA2_during_sleep>=(mean(SWA2_during_sleep)+2*std(SWA2_during_sleep)));
+  
+  if strcmp(signal,'delta1') strcmp(signal,'EEG1') 
+  PhysioVars(SWA1_outliers_indices,:)=[];
+  data(SWA1_outliers_indices,:)=[];
+  textdata(SWA1_outliers_indices,:)=[];
+  timestampvec{FileCounter}(SWA1_outliers_indices)=[];
+  end
+
+  if strcmp(signal,'delta2') strcmp(signal,'EEG2')
+  PhysioVars(SWA2_outliers_indices,:)=[];
+  data(SWA2_outliers_indices,:)=[];
+  textdata(SWA2_outliers_indices,:)=[];
+  timestampvec{FileCounter}(SWA2_outliers_indices)=[];
+  end 
+
+  [n1,x1]=hist(SWA1_during_sleep,linspace(0,max(SWA1_during_sleep),30));
+  [n2,x2]=hist(SWA2_during_sleep,linspace(0,max(SWA2_during_sleep),30));
+  figure
+  bar(x1,n1)
+  hold on
+  %plot(mean(SWA1_during_sleep),0:2*max(n1))
+  line([mean(SWA1_during_sleep)+2*std(SWA1_during_sleep) mean(SWA1_during_sleep)+2*std(SWA1_during_sleep)],[0 max(n1)])
+  hold off
+  mean(SWA1_during_sleep)+10*std(SWA1_during_sleep)
+  title('SWA1_during_sleep')
+
+  figure
+  bar(x2,n2)
+  hold on
+  line([mean(SWA2_during_sleep)+2*std(SWA2_during_sleep) mean(SWA2_during_sleep)+2*std(SWA2_during_sleep)],[0 max(n2)])
+  mean(SWA2_during_sleep)+10*std(SWA2_during_sleep)
+  title('SWA2_during_sleep')
+  hold off
+  pause
+
+
+
+
+  % Smooth the data after removing artifacts, not before
+  if epoch_length_in_seconds >=10
+      LactateSmoothed=medianfiltervectorized(data(:,1),1);
+      figure
+      plot(1:size(data(:,1),1),data(:,1),'r',1:size(data(:,1),1),LactateSmoothed,'b')
+    elseif epoch_length_in_seconds < 10
+      LactateSmoothed=medianfiltervectorized(data(:,1),2);
+    end
+  PhysioVars(:,2) = LactateSmoothed;
+  PhysioVars(:,3) = medianfiltervectorized(PhysioVars(:,3),2); 
+  PhysioVars(:,4) = medianfiltervectorized(PhysioVars(:,4),2);
+
+
 
   if strcmp(model,'5state')
     % re-score wake epochs into quiet wake vs. active wake, based on EMG. Wake=0,SWS=1,REM=2,quiet wake=3, active wake=4
@@ -348,14 +415,6 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     signal_data{FileCounter}(locations)=[];
     state_data{FileCounter}(locations)=[];
   end
-
-  % Remove all epochs marked as artifact (X in txt file, 5 in PhysioVars)
-  locationsX=find(state_data{FileCounter}==5);
-  data(locationsX,:)=[];
-  textdata(locationsX,:)=[];
-  timestampvec{FileCounter}(locationsX)=[];
-  signal_data{FileCounter}(locationsX)=[];
-  state_data{FileCounter}(locationsX)=[];
 
 
   % Compute the dynamic range for each data file (90th percentile - 10th percentile)

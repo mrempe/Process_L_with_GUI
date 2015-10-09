@@ -59,7 +59,7 @@ end
 % make a frequency plot, and use it to figure out upper and lower
 % bounds for the model (like Franken et al. 2001 Figure 1)
 
-[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,1,1);
+[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,0,0);
 
 
 % -- if using delta power normalize UA and LA to mean SWS delta 
@@ -151,8 +151,8 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
 end
 
 
-ElapsedTime=toc
-
+ElapsedTime=toc;
+disp(['ElapsedTime = ', num2str(ElapsedTime), ' seconds.'])
 
 % plot the best fit
 %t=0:dt:dt*(size(datafile,1)-1);
