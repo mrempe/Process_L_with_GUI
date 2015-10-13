@@ -327,47 +327,48 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % state_data{FileCounter}(locationsX)=[];
 
 
-  % Exclude artifacts in EEG that were not marked as X, but where SWA is at least 10 SDs away from
+  % Exclude artifacts in EEG that were not marked as X, but where SWA is at least 3 SDs away from
   % the mean for this animal.
   sleep_epochs = find(PhysioVars(:,1)==1);
   SWA1_during_sleep = PhysioVars(sleep_epochs,3);
   SWA2_during_sleep = PhysioVars(sleep_epochs,4);
-  SWA1_outliers_indices = find(SWA1_during_sleep>=(mean(SWA1_during_sleep)+2*std(SWA1_during_sleep)));
-  SWA2_outliers_indices = find(SWA2_during_sleep>=(mean(SWA2_during_sleep)+2*std(SWA2_during_sleep)));
+  SWA1_outliers_indices = find(SWA1_during_sleep>=(mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)));
+  SWA2_outliers_indices = find(SWA2_during_sleep>=(mean(SWA2_during_sleep)+3*std(SWA2_during_sleep)));
   
-  if strcmp(signal,'delta1') strcmp(signal,'EEG1') 
-  PhysioVars(SWA1_outliers_indices,:)=[];
-  data(SWA1_outliers_indices,:)=[];
-  textdata(SWA1_outliers_indices,:)=[];
-  timestampvec{FileCounter}(SWA1_outliers_indices)=[];
+  if strcmp(signal,'delta1') | strcmp(signal,'EEG1') 
+    PhysioVars(sleep_epochs(SWA1_outliers_indices),:)=[];
+    data(sleep_epochs(SWA1_outliers_indices),:)=[];
+    textdata(sleep_epochs(SWA1_outliers_indices),:)=[];
+    timestampvec{FileCounter}(sleep_epochs(SWA1_outliers_indices))=[];
   end
 
-  if strcmp(signal,'delta2') strcmp(signal,'EEG2')
-  PhysioVars(SWA2_outliers_indices,:)=[];
-  data(SWA2_outliers_indices,:)=[];
-  textdata(SWA2_outliers_indices,:)=[];
-  timestampvec{FileCounter}(SWA2_outliers_indices)=[];
+  if strcmp(signal,'delta2') | strcmp(signal,'EEG2')
+    PhysioVars(SWA2_outliers_indices,:)=[];
+    data(SWA2_outliers_indices,:)=[];
+    textdata(SWA2_outliers_indices,:)=[];
+    timestampvec{FileCounter}(SWA2_outliers_indices)=[];
   end 
 
-  [n1,x1]=hist(SWA1_during_sleep,linspace(0,max(SWA1_during_sleep),30));
-  [n2,x2]=hist(SWA2_during_sleep,linspace(0,max(SWA2_during_sleep),30));
+   % Uncomment these lines if you want to plot the histograms of delta activity during SWS
+   [n1,x1]=hist(SWA1_during_sleep,linspace(0,max(SWA1_during_sleep),30));
+  % [n2,x2]=hist(SWA2_during_sleep,linspace(0,max(SWA2_during_sleep),30));
   figure
   bar(x1,n1)
   hold on
-  %plot(mean(SWA1_during_sleep),0:2*max(n1))
-  line([mean(SWA1_during_sleep)+2*std(SWA1_during_sleep) mean(SWA1_during_sleep)+2*std(SWA1_during_sleep)],[0 max(n1)])
+  % %plot(mean(SWA1_during_sleep),0:2*max(n1))
+   line([mean(SWA1_during_sleep)+3*std(SWA1_during_sleep) mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)],[0 max(n1)])
   hold off
-  mean(SWA1_during_sleep)+10*std(SWA1_during_sleep)
-  title('SWA1_during_sleep')
+  % mean(SWA1_during_sleep)+10*std(SWA1_during_sleep)
+  % title('SWA1_during_sleep')
 
-  figure
-  bar(x2,n2)
-  hold on
-  line([mean(SWA2_during_sleep)+2*std(SWA2_during_sleep) mean(SWA2_during_sleep)+2*std(SWA2_during_sleep)],[0 max(n2)])
-  mean(SWA2_during_sleep)+10*std(SWA2_during_sleep)
-  title('SWA2_during_sleep')
-  hold off
-  pause
+  % figure
+  % bar(x2,n2)
+  % hold on
+  % line([mean(SWA2_during_sleep)+2*std(SWA2_during_sleep) mean(SWA2_during_sleep)+2*std(SWA2_during_sleep)],[0 max(n2)])
+  % mean(SWA2_during_sleep)+10*std(SWA2_during_sleep)
+  % title('SWA2_during_sleep')
+  % hold off
+  % pause
 
 
 
@@ -375,8 +376,8 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % Smooth the data after removing artifacts, not before
   if epoch_length_in_seconds >=10
       LactateSmoothed=medianfiltervectorized(data(:,1),1);
-      figure
-      plot(1:size(data(:,1),1),data(:,1),'r',1:size(data(:,1),1),LactateSmoothed,'b')
+      % figure
+      % plot(1:size(data(:,1),1),data(:,1),'r',1:size(data(:,1),1),LactateSmoothed,'b')
     elseif epoch_length_in_seconds < 10
       LactateSmoothed=medianfiltervectorized(data(:,1),2);
     end

@@ -62,19 +62,38 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   difference=ns-nr;  % need to find where this is 0
   id=find(diff(difference >= 0)); % finds crossings of the difference
                                   % vector, (keep only last one)
-  
-  if(isempty(id)) % if they don't cross
-    loc=find(nr>0);  % find non-zero bins of REM
-    loc2=find(ns>0); % find non-zero bins of SWS
-    if isempty(loc) LA=xs(loc2(1))
-    else LA=xr(loc(1)); % set to first non-zero bin  
-    end
-  else
-    id=id(end);
-    LA = xs(id)-(difference(id)*(xs(id+1)-xs(id))/(difference(id+1)-difference(id)));
+  max_REM_loc = xr(find(nr==max(nr)));
+  max_SWS_loc = xs(find(ns==max(ns)));
+
+  % New method to find crossing of REM and SWS histograms.
+  % First find all of the crossing (some of these may be way off in the tails)
+  % Then choose the one that is between the maximums of each curve
+  LA = xs(id)-(difference(id).*(xs(id+1)-xs(id))./(difference(id+1)-difference(id)));
+  index_crossing_between_maxREM_andmaxSWS = find(LA>max_REM_loc & LA<max_SWS_loc);
+  if ~isempty(index_crossing_between_maxREM_andmaxSWS) 
+    LA = LA(index_crossing_between_maxREM_andmaxSWS);
+  else                        % if the two histograms don't cross between their maximums
+   LA=xr(find(nr==max(nr)));  % set to max value in REMS histogram 
   end
+
+  % if(isempty(id)) % if they don't cross
+  %   loc=find(nr>0);  % find non-zero bins of REM
+  %   loc2=find(ns>0); % find non-zero bins of SWS
+  %   if isempty(loc) 
+  %     LA=xs(loc2(1))
+  %   %else LA=xr(loc(1)); % set to first non-zero bin  
+  %   else 
+  %     LA=xr(find(nr==max(nr)));  % set to max value in REMS histogram
+  %   end
+  % else
+  %   id=id(end);
+  %   LA = xs(id)-(difference(id)*(xs(id+1)-xs(id))/(difference(id+1)-difference(id)));
+  % end
 % UA (upper assymptote)
   UA=quantile(sleepdata,.9);
+LA
+UA
+
 
 % plot the histograms
   if newfig==1 
@@ -84,14 +103,17 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     set(h,'FaceColor',[0.5 0.5 0.5],'EdgeColor','k')
     hold on
     bar(xr,nr)
-  %h = findobj(gca,'Type','patch');
-  %set(h,'FaceColor',[0 0.5 0.5],'EdgeColor','w')
+    %h = findobj(gca,'Type','patch');
+    %set(h,'FaceColor',[0 0.5 0.5],'EdgeColor','w')
   
   %[nw,xw]=hist(wakedata,xbins)  % wake data
   % h = findobj(gca,'Type','patch');
   % set(h,'FaceColor',[0 1 0],'EdgeColor','w')
-    plot(LA,0:max(ns)) % plot vertical line at LA
-    plot(UA,0:max(ns))
+    line([LA LA],[0 max(ns)])
+    line([UA UA],[0 max(ns)])
+    %plot(LA,0:max(ns)) % plot vertical line at LA
+    %plot(UA,0:max(ns))
+    
     hold off
     xlabel('DELTA POWER [\mu V^2]')
     ylabel('FREQUENCY')

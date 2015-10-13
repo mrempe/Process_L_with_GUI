@@ -70,8 +70,6 @@ for i=num_epochs_in_window:size(datafile,1)  % if at last 90% SWS and if there a
   end
 end
 
-starting_indices
-pause
 
 
 % now combine overlapping windows

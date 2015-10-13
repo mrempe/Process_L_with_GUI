@@ -50,16 +50,17 @@ tic
 if strcmp(signal,'lactate')
   tL_start_time  = timestampvec(1) + hours(window_length/2);
   tL_end_time    = timestampvec(end) - hours(window_length/2);
-  tL_start_index = find(timestampvec==tL_start_time);
-  tL_end_index   = find(timestampvec==tL_end_time);
+  indices = find(timestampvec>=tL_start_time);  % this handles the case where the start time has been left out due to artifact
+  tL_start_index = indices(1);
+  indices = find(timestampvec>=tL_end_time);
+  tL_end_index   = indices(1);
   tL = timestampvec(tL_start_index:tL_end_index);
 else 
   tL =0;
 end
 % make a frequency plot, and use it to figure out upper and lower
 % bounds for the model (like Franken et al. 2001 Figure 1)
-
-[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,0,0);
+[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,1,1);
 
 
 % -- if using delta power normalize UA and LA to mean SWS delta 
@@ -96,6 +97,9 @@ end
 
 %mask=(window_length/2)*(60*60/epoch_length)+1:size(datafile,1)-(window_length/2)*(60*60/epoch_length);
 if strcmp(signal,'lactate')
+  size(timestampvec)
+  tL(1)
+  tL(end)
   mask=find(timestampvec==tL(1)):find(timestampvec==tL(end));
 else
   mask=0;
@@ -140,7 +144,7 @@ Ti=best_tau_i;    %output the best taus
 Td=best_tau_d;
 
 
-% run one more time with best fit and plot it (add a plot with circles)
+% run one more time with best fit and plot it (with data points)
 if  strcmp(signal,'lactate')
   best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,timestampvec,tL,epoch_length,filename);
   %error_instant=run_instant_model(datafile,LA,UA,window_length);
