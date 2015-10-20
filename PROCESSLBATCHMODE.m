@@ -172,14 +172,14 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % textdata has mm/dd/yyy,HH:MM:SS AM format, but may or may not include quotes or single quotes,
   % so to be more robust, find the second colon and use that to get the seconds field of the time stamp
   c = find(textdata{1,1}==':');   % Find all locations of the colon in the first time stamp
-  s = find(textdata{1,1}=='/');
+  l = find(textdata{1,1}=='/');
   for i=1:length(textdata)
     c = find(textdata{i,1}==':');   % Find all locations of the colon in the ith time stamp
-    s = find(textdata{i,1}=='/');
+    sl = find(textdata{i,1}=='/');
     first_colon_loc(i)  = c(1);   
     second_colon_loc(i) = c(2);
-    first_slash_loc(i)  = s(1);
-    second_slash_loc(i) = s(2);
+    first_slash_loc(i)  = sl(1);
+    second_slash_loc(i) = sl(2);
   end 
   hour_first_time_stamp    = str2double(textdata{1,1}(first_colon_loc(1)-2:first_colon_loc(1)-1));  
   hour_second_time_stamp   = str2double(textdata{2,1}(first_colon_loc(1)-2:first_colon_loc(1)-1));
@@ -283,6 +283,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   EEG1_1to2Hzcolumn = intersect(find(EEG1),find(onetotwo))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
   EEG2_1to2Hzcolumn = intersect(find(EEG2),find(onetotwo))-2;
   EMG_column = find(EMG)-2;
+  EMG_column = EMG_column(1);  % in case there are more than one columns with EMG in header, take the first one.
 
   PhysioVars(:,3) = mean(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
   PhysioVars(:,4) = mean(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
@@ -323,6 +324,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   data(locationsX,:)=[];
   textdata(locationsX,:)=[];
   timestampvec{FileCounter}(locationsX)=[];
+  EMG_data(locationsX)=[];
   % signal_data{FileCounter}(locationsX)=[];
   % state_data{FileCounter}(locationsX)=[];
 
@@ -349,15 +351,15 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     timestampvec{FileCounter}(SWA2_outliers_indices)=[];
   end 
 
-   % Uncomment these lines if you want to plot the histograms of delta activity during SWS
-   [n1,x1]=hist(SWA1_during_sleep,linspace(0,max(SWA1_during_sleep),30));
-  % [n2,x2]=hist(SWA2_during_sleep,linspace(0,max(SWA2_during_sleep),30));
-  figure
-  bar(x1,n1)
-  hold on
-  % %plot(mean(SWA1_during_sleep),0:2*max(n1))
-   line([mean(SWA1_during_sleep)+3*std(SWA1_during_sleep) mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)],[0 max(n1)])
-  hold off
+  %  % Uncomment these lines if you want to plot the histograms of delta activity during SWS
+  %  [n1,x1]=hist(SWA1_during_sleep,linspace(0,max(SWA1_during_sleep),30));
+  % % [n2,x2]=hist(SWA2_during_sleep,linspace(0,max(SWA2_during_sleep),30));
+  % figure
+  % bar(x1,n1)
+  % hold on
+  % % %plot(mean(SWA1_during_sleep),0:2*max(n1))
+  %  line([mean(SWA1_during_sleep)+3*std(SWA1_during_sleep) mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)],[0 max(n1)])
+  % hold off
   % mean(SWA1_during_sleep)+10*std(SWA1_during_sleep)
   % title('SWA1_during_sleep')
 
@@ -373,7 +375,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
 
 
-  % Smooth the data after removing artifacts, not before
+  % Smooth the data after removing epochs marked as artifacts, not before
   if epoch_length_in_seconds >=10
       LactateSmoothed=medianfiltervectorized(data(:,1),1);
       % figure
@@ -384,7 +386,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   PhysioVars(:,2) = LactateSmoothed;
   PhysioVars(:,3) = medianfiltervectorized(PhysioVars(:,3),2); 
   PhysioVars(:,4) = medianfiltervectorized(PhysioVars(:,4),2);
-
+  
 
 
   if strcmp(model,'5state')

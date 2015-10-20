@@ -59,6 +59,10 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,timestam
 d=diff(timestampvec);   % array of time differences, so I know when an epoch has been dropped due to artifact
 d=hours(d);   % convert d to hours
 
+dL=diff(tL);
+dL=hours(dL);
+
+
 % CASE 1: using delta power histogram to choose upper and lower
 % assymptotes for the model
 if length(LA)==1
@@ -149,7 +153,7 @@ l_start_index = find(timestampvec==tL(1));
  
     %for i=1:size(dataset,1)-(window_length*(60*60/epoch_length)+1)
     for i=1:length(tL)-1
-      if d(i) ~= dt       % if there is missing data (artifact) don't update S for the next time step
+      if dL(i) ~= dt       % if there is missing data (artifact) don't update S for the next time step
         S(i+1) = S(i);
       else
       %if dataset(i+(window_length/2)*(60*60/epoch_length),1)==0 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==2 || dataset(i+(window_length/2)*(60*60/epoch_length),1)==4    %wake,REMS, or active wake 

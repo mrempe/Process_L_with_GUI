@@ -50,17 +50,17 @@ tic
 if strcmp(signal,'lactate')
   tL_start_time  = timestampvec(1) + hours(window_length/2);
   tL_end_time    = timestampvec(end) - hours(window_length/2);
-  indices = find(timestampvec>=tL_start_time);  % this handles the case where the start time has been left out due to artifact
-  tL_start_index = indices(1);
-  indices = find(timestampvec>=tL_end_time);
-  tL_end_index   = indices(1);
+  indices_start = find(timestampvec>=tL_start_time);  % this handles the case where the start time has been left out due to artifact
+  tL_start_index = indices_start(1);
+  indices_end = find(timestampvec>=tL_end_time);
+  tL_end_index   = indices_end(1);
   tL = timestampvec(tL_start_index:tL_end_index);
 else 
   tL =0;
 end
 % make a frequency plot, and use it to figure out upper and lower
 % bounds for the model (like Franken et al. 2001 Figure 1)
-[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,1,1);
+[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,0,0);
 
 
 % -- if using delta power normalize UA and LA to mean SWS delta 
@@ -108,7 +108,7 @@ end
 %dt=1/(60*60/epoch_length);  % assuming  t is in hours 
 dt=timestampvec(2:end)-timestampvec(1:end-1);
 dt=hours(dt);  % convert dt into hours to use in run_S_model
-dt=dt(1);        % only want one value, not a vector. Assume all epochs are the same length
+dt=min(dt);        % only want one value, not a vector. Take the minimum in case there is missing data
 % tau_i=[0.05:0.01:1 1.1:.5:5];  %1:.12:25
 % tau_d=[0.05:0.01:1 1.1:.5:5]; %0.1:.025:5
 % error=zeros(length(tau_i),length(tau_d));
@@ -250,8 +250,11 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
 
     figure
     %L_indices = (window_length/2)*(60*60/epoch_length)+1:length(t)-(window_length/2)*(60*60/epoch_length);
-    L_indices = find(timestampvec>=tL(1) & timestampvec<=tL(end));
-    
+    %L_indices = find(timestampvec>=tL(1) & timestampvec<=tL(end));
+    L_indices = tL_start_index:tL_end_index;
+    size(L_indices)
+    size(UA)
+    size(LA)
     scaled_lactate_data = ((UA-LA)-(UA-datafile(L_indices,2)'))./(UA-LA);
     only_sleep_indices_L = find(datafile(L_indices,1)==1);
     only_wake_indices_L  = find(datafile(L_indices,1)==0);
