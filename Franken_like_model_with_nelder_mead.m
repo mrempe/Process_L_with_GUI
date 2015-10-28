@@ -242,7 +242,11 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     end
 
     if strcmp(model,'5state')
-      legend('Wake','SWS','REMS','QW','AW','Model')
+      if isempty(only_wake_indices)
+        legend('SWS','REMS','QW','AW','Model')
+      else
+        legend('Wake','SWS','REMS','QW','AW','Model')
+      end 
     end
     
 
@@ -289,7 +293,11 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     end
 
     if strcmp(model,'5state')
-      legend('Wake','SWS','REMS','QW','AW','Model')
+      if isempty(only_wake_indices_L)
+        legend('SWS','REMS','QW','AW','Model')
+      else
+        legend('Wake','SWS','REMS','QW','AW','Model')
+      end 
     end
 
 

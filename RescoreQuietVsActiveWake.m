@@ -2,8 +2,8 @@ function[newstate]=RescoreQuietVsActiveWake(statechars,Emgdata,QThreshold,AThres
 
 EmgWakeOnly=Emgdata(statechars==0);
 newstate=statechars;
-newstate(Emgdata<=quantile(EmgWakeOnly,QThreshold) & statechars==0)=3;    %Quiet wake values are relabeled as state 3.
-newstate(Emgdata>=quantile(EmgWakeOnly,AThreshold) & statechars==0)=4;    %Active wake values are relabeled as state 4.
+newstate(Emgdata<=round(quantile(EmgWakeOnly,QThreshold),4) & statechars==0)=3;    %Quiet wake values are relabeled as state 3.
+newstate(Emgdata>=round(quantile(EmgWakeOnly,AThreshold),4) & statechars==0)=4;    %Active wake values are relabeled as state 4.
 
 
 
