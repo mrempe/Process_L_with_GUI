@@ -151,6 +151,14 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   %[data,textdata]=importdatafile(files(FileCounter).name,directory);%importfile returns data (a matrix) and textdata (a cell array)
   [data,textdata]=importdatafile(files{FileCounter},directory);%importfile returns data (a matrix) and textdata (a cell array)
 
+  % if data and/or textdata have empty cells, remove those epochs
+  emptycells = cellfun(@isempty,textdata(:,1));
+  textdata(emptycells,:) = [];      % remove all epochs that are empty
+  data(emptycells,:)     = [];
+
+
+
+
   if ~isempty(strfind(SkipString,':'))
     for i=1:length(textdata)
       SkipString_occurence_vec{i} = strfind(char(textdata(i,1)),SkipString);
@@ -171,8 +179,8 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % but that was not robust enough since sometimes there is a change in minutes between those two timestamps
   % textdata has mm/dd/yyy,HH:MM:SS AM format, but may or may not include quotes or single quotes,
   % so to be more robust, find the second colon and use that to get the seconds field of the time stamp
-  c = find(textdata{1,1}==':');   % Find all locations of the colon in the first time stamp
-  l = find(textdata{1,1}=='/');
+  % c = find(textdata{1,1}==':');   % Find all locations of the colon in the first time stamp
+  % l = find(textdata{1,1}=='/');
   for i=1:length(textdata)
     c = find(textdata{i,1}==':');   % Find all locations of the colon in the ith time stamp
     sl = find(textdata{i,1}=='/');
@@ -208,7 +216,9 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   end
 
   timestampvec{FileCounter} = datetime(Y,M,D,H,m,s);  % this is a datetime vector with all the timestamps in it. Use it to plot and drop elements from this vector where artifacts happen
-
+  if min(diff(timestampvec{FileCounter})) < 0
+    error('Time Stamp error: negative dt value')
+  end
 
   window_length = 4;      % length of moving window used to compute UA and LA if signal is lactate.  
   % if strcmp(signal,'lactate')      % cut off data if using lactate sensor, smooth lactate data
@@ -519,7 +529,10 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   signal_data{FileCounter} = signal_data{FileCounter}(start_index:end_index,1);
   %TimeStampMatrix{FileCounter} = TimeStampMatrix{FileCounter}(start_index:end_index);
   timestampvec{FileCounter} = timestampvec{FileCounter}(start_index:end_index);
- 
+  % disp(['START TIME: ' num2str(hour(timestampvec{FileCounter}(1))) ':' num2str(minute(timestampvec{FileCounter}(1))) ':' num2str(second(timestampvec{FileCounter}(1)))])
+  % disp(['recording length (w/o allowing settling: ' num2str(hours(timestampvec{FileCounter}(end)-timestampvec{FileCounter}(1)))])
+
+
   % compute the length of the datafile in hours 
   % start_time = TimeStampMatrix{FileCounter}(:,1);
   % end_time   = TimeStampMatrix{FileCounter}(:,end);

@@ -180,11 +180,16 @@ end_times = tL+half_window;
 for i=1:length(tL)
   %start_time = tL(i) - half_window;
   %end_time   = tL(i) + half_window;
-  indices_in_window = find(timestampvec>=start_times(i) & timestampvec<=end_times(i));
+  %indices_in_window = find(timestampvec>=start_times(i) & timestampvec<=end_times(i));
 
-  LA(i) = quantile(data(indices_in_window),0.01);
-  UA(i) = quantile(data(indices_in_window),0.99);
-  
+  % LA(i) = quantile(data(indices_in_window),0.01);
+  % UA(i) = quantile(data(indices_in_window),0.99);
+  % LA(i) = quantile(data(timestampvec>=start_times(i) & timestampvec<=end_times(i)),0.01);
+  % UA(i) = quantile(data(timestampvec>=start_times(i) & timestampvec<=end_times(i)),0.99);
+  LAUA = quantile(data(timestampvec>=start_times(i) & timestampvec<=end_times(i)),[0.01 0.99]);
+  LA(i) = LAUA(1);
+  UA(i) = LAUA(2);
+
 end
 
 

@@ -97,10 +97,8 @@ end
 
 %mask=(window_length/2)*(60*60/epoch_length)+1:size(datafile,1)-(window_length/2)*(60*60/epoch_length);
 if strcmp(signal,'lactate')
-  size(timestampvec)
-  tL(1)
-  tL(end)
   mask=find(timestampvec==tL(1)):find(timestampvec==tL(end));
+%disp(['recording length (after settling and artifacts): ' num2str(hours(timestampvec(end)-timestampvec(1)))])
 else
   mask=0;
 end
@@ -164,7 +162,7 @@ disp(['ElapsedTime = ', num2str(ElapsedTime), ' seconds.'])
 
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
   error_instant=0;  % this won't get set if signal is delta, but the function returns it
-  figure
+  %figure
   %only_sleep_indices=find(datafile(:,1)==1);  
   %sleep_eeg1=datafile(only_sleep_indices,3);
   %sleep_eeg2=datafile(only_sleep_indices,4);
@@ -252,9 +250,6 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
     %L_indices = (window_length/2)*(60*60/epoch_length)+1:length(t)-(window_length/2)*(60*60/epoch_length);
     %L_indices = find(timestampvec>=tL(1) & timestampvec<=tL(end));
     L_indices = tL_start_index:tL_end_index;
-    size(L_indices)
-    size(UA)
-    size(LA)
     scaled_lactate_data = ((UA-LA)-(UA-datafile(L_indices,2)'))./(UA-LA);
     only_sleep_indices_L = find(datafile(L_indices,1)==1);
     only_wake_indices_L  = find(datafile(L_indices,1)==0);
