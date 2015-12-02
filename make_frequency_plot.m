@@ -56,6 +56,7 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
 % max(sleepdata)  
   xbins=linspace(0,max(sleepdata),30);
   
+
   % compute the histograms
   [ns,xs]=hist(sleepdata,xbins);  %sleep data
   [nr,xr]=hist(remdata,xbins);   %REM data 
@@ -91,8 +92,6 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   % end
 % UA (upper assymptote)
   UA=quantile(sleepdata,.9);
-LA
-UA
 
 
 % plot the histograms

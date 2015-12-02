@@ -94,7 +94,7 @@ end
 
 if do_restrict_start_time_end_time == 1
   prompt4 = {'Start time in 17:00:00 format','Which occurence of this time do you want to use? (1,2, or first, second, etc.)', ...
-            'End time in 17:00:00 format','Which occurence of this time do you want to use? (1,2, or first, second, etc.)'};
+            'End time in 17:00:00 format.  Or type "end" to go to the end of the recording.','Which occurence of this time do you want to use? (1,2, or first, second, etc.)'};
   defaults4 = {'17:00:00','1','17:00:00','2'};
   dlg_title4 = 'How do you want to restrict the data? ';
   restrict_input = inputdlg(prompt4,dlg_title4,1,defaults4);
@@ -106,7 +106,7 @@ if do_restrict_start_time_end_time == 1
 end
 
 
-SkipString='07:00:00'
+SkipString='07:00:00';
 occurence = 2;  % start at the second occurance of SkipString
 
 
@@ -279,15 +279,33 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % Find the columns with EEG1 1-2 Hz and EEG2 1-2 Hz  
   fid = fopen(strcat(directory,files{FileCounter}));
   tLine1 = fgetl(fid);
+  tLine2 = fgetl(fid);    %get the second line
   ColumnsHeads = textscan(tLine1,'%s','delimiter', sprintf('\t'));
+  ColumnSecondRow = textscan(tLine2,'%s','delimiter',sprintf('\t'));
   HeadChars=char(ColumnsHeads{1,1});
+  SecondLineChars = char(ColumnSecondRow{1,1});
   for i=1:length(HeadChars)
     EEG1(i)=~isempty(strfind(HeadChars(i,:),'EEG 1'));
+    if sum(EEG1(i))==0
+      EEG1(i)=~isempty(strfind(HeadChars(i,:),'EEG1'));  % handle 'EEG 1' or 'EEG1'
+    end
     EEG2(i)=~isempty(strfind(HeadChars(i,:),'EEG 2'));
+    if sum(EEG2(i))==0
+      EEG2(i)=~isempty(strfind(HeadChars(i,:),'EEG2'));
+    end
     onetotwo(i)=~isempty(strfind(HeadChars(i,:),'1-2 '));
     EMG(i)=~isempty(strfind(HeadChars(i,:),'EMG'));
   end
+  
+  if isempty(strfind(tLine2,'[nA]'))  % if there isn't a column that contains "[nA]", then there isn't a lactate signal
+    lactate_signal_present = 0;
+  end
   fclose('all');   %close all the files
+
+
+  if strcmp(signal,'lactate') & lactate_signal_present==0
+    error('There is no lactate signal present in this recording')
+  end 
 
 
   EEG1_1to2Hzcolumn = intersect(find(EEG1),find(onetotwo))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
@@ -295,11 +313,13 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   EMG_column = find(EMG)-2;
   EMG_column = EMG_column(1);  % in case there are more than one columns with EMG in header, take the first one.
 
+
   PhysioVars(:,3) = mean(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
   PhysioVars(:,4) = mean(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
 
   % EMG data 
   EMG_data = data(:,EMG_column);
+
 
 
 
@@ -352,6 +372,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     data(sleep_epochs(SWA1_outliers_indices),:)=[];
     textdata(sleep_epochs(SWA1_outliers_indices),:)=[];
     timestampvec{FileCounter}(sleep_epochs(SWA1_outliers_indices))=[];
+    EMG_data(sleep_epochs(SWA1_outliers_indices))=[];
   end
 
   if strcmp(signal,'delta2') | strcmp(signal,'EEG2')
@@ -359,6 +380,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     data(SWA2_outliers_indices,:)=[];
     textdata(SWA2_outliers_indices,:)=[];
     timestampvec{FileCounter}(SWA2_outliers_indices)=[];
+    EMG_data(sleep_epochs(SWA2_outliers_indices))=[];
   end 
 
   %  % Uncomment these lines if you want to plot the histograms of delta activity during SWS
@@ -481,12 +503,20 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   if do_restrict_start_time_end_time
     for i=1:length(textdata)
       start_string_occurence_vec{i} = strfind(char(textdata(i,1)),restrict_start_clock_time);
-      end_string_occurence_vec{i}   = strfind(char(textdata(i,1)),restrict_end_clock_time);
     end 
     locs_start  = ~cellfun('isempty',start_string_occurence_vec);
-    locs_end    = ~cellfun('isempty',end_string_occurence_vec);
     start_index = max(find(locs_start,start_time_occurence)); 
-    end_index = max(find(locs_end,end_time_occurence));
+    
+    if restrict_end_clock_time =='end'
+      end_index = size(signal_data{FileCounter},1);
+    else
+      for i=1:length(textdata)
+        end_string_occurence_vec{i}   = strfind(char(textdata(i,1)),restrict_end_clock_time);
+      end 
+      locs_end    = ~cellfun('isempty',end_string_occurence_vec);
+      end_index = max(find(locs_end,end_time_occurence));
+    end   
+
   end
 
 
@@ -640,7 +670,19 @@ if do_write_tau_values_to_file
   output_directory = strcat(directory,'Tau_values_output_',date_time);
   mkdir(output_directory)
 
-  write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict,restrict_hours_from_start,Taui,TauD)
+Taui
+TauD
+
+  if do_restrict_hours_from_start
+    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
+                             restrict_hours_from_start,0,0,Taui,TauD);
+  elseif do_restrict_start_time_end_time
+    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
+                             0,restrict_start_clock_time,restrict_end_clock_time,Taui,TauD);
+  else
+    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
+                             0,0,0,Taui,TauD);
+  end     
 end
 
 
