@@ -46,23 +46,26 @@ if ~iscell(files), files = {files}; end
 
 
 prompt = {'Do you want to use delta power in channel 1 (EEG1), delta power in channel 2 (EEG2), beta1, beta2, or lactate?', ...
-'Do you want to use BruteForce or NelderMead?','Do you want to rescore the data into Quiet Wake and Active Wake and use a 5-state model rather than a 3-state model?  (1 for yes, 0 for no)', ...
+'Do you want to define a custom range of frequencies to define SWA?', ...
+'Do you want to use BruteForce or NelderMead?', ...
+'Do you want to rescore the data into Quiet Wake and Active Wake and use a 5-state model rather than a 3-state model?  (1 for yes, 0 for no)', ...
 'Do you want to restrict the data using hours from the beginning of the recording? (1 for yes, 0 for no)', ...
 'Do you want to restrict the data to be between two specific times? (1 for yes, 0 for no)', ...
 'Do you want to restrict the data using epochs from the beginning of the recording? (1 for yes, 0 for no)', ...
 'Would you like to write the optimal tau values to a file with a Data Source Info Tab? (1 for yes, 0 for no)'};
-defaults = {'EEG2','NelderMead','0','0','0','0','0'}; 
+defaults = {'EEG2','0','NelderMead','0','0','0','0','0'}; 
 dlg_title = 'Input';
 inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
 
 
-signal=inputs{1};
-algorithm = inputs{2};
-do_rescore = str2double(inputs{3});
-do_restrict_hours_from_start = str2double(inputs{4});
-do_restrict_start_time_end_time = str2double(inputs{5});
-do_restrict_using_epochs = str2double(inputs{6});
-do_write_tau_values_to_file = str2double(inputs{7});
+signal.name=inputs{1};
+define_freq_range_yesno = inputs{2};
+algorithm = inputs{3};
+do_rescore = str2double(inputs{4});
+do_restrict_hours_from_start = str2double(inputs{5});
+do_restrict_start_time_end_time = str2double(inputs{6});
+do_restrict_using_epochs = str2double(inputs{7});
+do_write_tau_values_to_file = str2double(inputs{8});
 
 if do_rescore == 1
   model = '5state';
@@ -73,10 +76,10 @@ else
 end
 
 if strcmp(signal,'Beta1')
-  signal = 'beta1';    % make lowercase so I don't have to have all 4 cases everywhere
+  signal.name = 'beta1';    % make lowercase so I don't have to have all 4 cases everywhere
 end 
 if strcmp(signal,'Beta2')
-  signal = 'beta2';
+  signal.name = 'beta2';
 end
 
 
@@ -91,6 +94,24 @@ end
 % else 
 %   keyword = 'None';
 % end
+
+% Handle the case where a custom frequency range is input for Slow Wave Activity
+if define_freq_range_yesno == 1
+  prompt23    = {'Lower value for the range of frequencies (at least 1)', 'Upper value for the range of frequencies (at most 8)'};
+  defaults23  = {'1','4'};
+  dlg_title23 = 'Define the frequency range for Slow Wave Activity';
+  freq_range_input = inputdlg(prompt23,dlg_title23,1,defaults23,'on');
+  freq_range = [str2double(freq_range_input{1}) str2double(freq_range_input{2})];
+else
+  freq_range = [1 4];   % default is 1-4 Hz
+end 
+
+if strcmp(signal,'lactate')
+  signal.freq_range = [];
+else 
+  signal.freq_range = freq_range;
+end
+
 
 % Handle the case where a restriction is given in terms of hours from the beginning of recording.  
 if do_restrict_hours_from_start == 1
@@ -131,8 +152,8 @@ occurence = 2;  % start at the second occurance of SkipString
 
 
 
-if ~strcmp(signal,'lactate') && ~strcmp(signal,'delta1') && ~strcmp(signal,'delta2') ... 
-  && ~strcmp(signal,'EEG1') && ~strcmp(signal,'EEG2') && ~strcmp(signal,'beta1') && ~strcmp(signal,'beta2')  && ~strcmp(signal,'Beta1') && ~strcmp(signal,'Beta2') 
+if ~strcmp(signal.name,'lactate') && ~strcmp(signal.name,'delta1') && ~strcmp(signal.name,'delta2') ... 
+  && ~strcmp(signal.name,'EEG1') && ~strcmp(signal.name,'EEG2') && ~strcmp(signal.name,'beta1') && ~strcmp(signal.name,'beta2')  && ~strcmp(signal.name,'Beta1') && ~strcmp(signal.name,'Beta2') 
   error('Input signal must be one of the following: ''lactate'', ''delta1'', ''delta2'', ''EEG1'', ''EEG2'', ''beta1'' or ''beta2'' ')
 end
 
@@ -331,9 +352,9 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     if sum(EEG2(i))==0
       EEG2(i)=~isempty(strfind(HeadChars(i,:),'EEG2'));
     end
-    onetotwo(i)=~isempty(strfind(HeadChars(i,:),'1-2 '));
-    fifteentosixteen(i)=~isempty(strfind(HeadChars(i,:),'15-16 '));
-    thirtyfourtothirtyfive(i)=~isempty(strfind(HeadChars(i,:),'34-35 '));
+    onetotwo(i)               =~ isempty(strfind(HeadChars(i,:),'1-2 '));
+    fifteentosixteen(i)       =~ isempty(strfind(HeadChars(i,:),'15-16 '));
+    thirtyfourtothirtyfive(i) =~ isempty(strfind(HeadChars(i,:),'34-35 '));
 
     EMG(i)=~isempty(strfind(HeadChars(i,:),'EMG'));
   end
@@ -344,7 +365,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   fclose('all');   %close all the files
 
 
-  if strcmp(signal,'lactate') & lactate_signal_present==0
+  if strcmp(signal.name,'lactate') & lactate_signal_present==0
     error('There is no lactate signal present in this recording')
   end 
 
@@ -365,7 +386,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   PhysioVars(:,4) = mean(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
   PhysioVars(:,5) = sum(data(:,EEG1_15to16Hzcolumn:EEG1_34to35Hzcolumn),2);  % NeuroScore uses sum when you output beta as a column
   PhysioVars(:,6) = sum(data(:,EEG2_15to16Hzcolumn:EEG2_34to35Hzcolumn),2);  
-
+  PhysioVars(:,7) = sum(data(:,low_custom_column:high_custom_column),2);
 
   % EMG data 
   EMG_data = data(:,EMG_column);
@@ -417,7 +438,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   SWA1_outliers_indices = find(SWA1_during_sleep>=(mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)));
   SWA2_outliers_indices = find(SWA2_during_sleep>=(mean(SWA2_during_sleep)+3*std(SWA2_during_sleep)));
   
-  if strcmp(signal,'delta1') | strcmp(signal,'EEG1') 
+  if strcmp(signal.name,'delta1') | strcmp(signal.name,'EEG1') 
     PhysioVars(sleep_epochs(SWA1_outliers_indices),:)=[];
     data(sleep_epochs(SWA1_outliers_indices),:)=[];
     textdata(sleep_epochs(SWA1_outliers_indices),:)=[];
@@ -425,7 +446,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     EMG_data(sleep_epochs(SWA1_outliers_indices))=[];
   end
 
-  if strcmp(signal,'delta2') | strcmp(signal,'EEG2')
+  if strcmp(signal.name,'delta2') | strcmp(signal.name,'EEG2')
     PhysioVars(SWA2_outliers_indices,:)=[];
     data(SWA2_outliers_indices,:)=[];
     textdata(SWA2_outliers_indices,:)=[];
@@ -470,7 +491,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   PhysioVars(:,4) = medianfiltervectorized(PhysioVars(:,4),2);
   PhysioVars(:,5) = medianfiltervectorized(PhysioVars(:,5),2);  % Beta EEG1
   PhysioVars(:,6) = medianfiltervectorized(PhysioVars(:,6),2);  % Beta EEG2
-
+  PhysioVars(:,7) = medianfiltervectorized(PhysioVars(:,7),2);  % custom frequency range
 
   if strcmp(model,'5state')
     % re-score wake epochs into quiet wake vs. active wake, based on EMG. Wake=0,SWS=1,REM=2,quiet wake=3, active wake=4
@@ -483,21 +504,23 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   end
 
 
-  if strcmp(signal,'lactate')
+  if strcmp(signal.name,'lactate')
     signal_data{FileCounter} = PhysioVars(:,2);
-  elseif strcmp(signal,'delta1') || strcmp(signal,'EEG1')
+  elseif strcmp(signal.name,'delta1') || strcmp(signal.name,'EEG1')
     signal_data{FileCounter} = PhysioVars(:,3);
-  elseif strcmp(signal,'delta2') || strcmp(signal,'EEG2')
+  elseif strcmp(signal.name,'delta2') || strcmp(signal.name,'EEG2')
     signal_data{FileCounter} = PhysioVars(:,4);
-  elseif strcmp(signal,'beta1') || strcmp(signal,'Beta1')
+  elseif strcmp(signal.name,'beta1') || strcmp(signal.name,'Beta1')
     signal_data{FileCounter} = PhysioVars(:,5);
-  elseif strcmp(signal,'beta2') || strcmp(signal,'Beta2')
+  elseif strcmp(signal.name,'beta2') || strcmp(signal.name,'Beta2')
     signal_data{FileCounter} = PhysioVars(:,6);
+  elseif strcmp(signal.name,'custom')
+    signal_data{FileCounter} = PhysioVars(:,7);
   end
 
 
 % Remove all epochs of data where the lactate signal is negative (if using lactate as the signal)
-  if strcmp(signal,'lactate')
+  if strcmp(signal.name,'lactate')
     locations=find(data(:,1)<0);
     data(locations,:)=[];
     textdata(locations,:)=[];
@@ -635,7 +658,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % Find the first two NREM episodes of at least 1 minute, and start 
   % the simulation at the end of the second 1-minute NREM episode
   % ----
-  if strcmp(signal,'lactate') && (strcmp(restrict_hours_from_start,'none') || restrict_hours_from_start(1)==0)
+  if strcmp(signal.name,'lactate') && (strcmp(restrict_hours_from_start,'none') || restrict_hours_from_start(1)==0)
     ind_of_second_NREM_episode_end = find_first_two_NREM_episodes(state_data{FileCounter});
     state_data{FileCounter}  = state_data{FileCounter}(ind_of_second_NREM_episode_end:end);
     signal_data{FileCounter} = signal_data{FileCounter}(ind_of_second_NREM_episode_end:end);
@@ -674,10 +697,10 @@ for FileCounter=1:length(files)
   disp(['File number ', num2str(FileCounter), ' of ', num2str(length(files))])
   display(files{FileCounter})
   if strcmp(algorithm,'NelderMead')  
-    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
+    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal.name,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
   end
   if strcmp(algorithm,'BruteForce')
-    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
+    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal.name,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
   end
 
   residual(FileCounter) = best_error;
@@ -728,16 +751,16 @@ if do_write_tau_values_to_file
 
 
   if do_restrict_hours_from_start
-    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
+    write_tau_values_to_file(files,directory,model,signal.name,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
                              do_restrict_using_epochs,restrict_hours_from_start,0,0,0,0,Taui,TauD,LowA,UppA);
   elseif do_restrict_start_time_end_time
-    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
+    write_tau_values_to_file(files,directory,model,signal.name,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
                              do_restrict_using_epochs,0,restrict_start_clock_time,restrict_end_clock_time,0,0,Taui,TauD,LowA,UppA);
   elseif do_restrict_using_epochs
-    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
+    write_tau_values_to_file(files,directory,model,signal.name,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
                              do_restrict_using_epochs,restrict_hours_from_start,0,0,restrict_epochs_from_start(1),restrict_epochs_from_start(2),Taui,TauD,LowA,UppA);       
   else
-    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
+    write_tau_values_to_file(files,directory,model,signal.name,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
                              do_restrict_using_epochs,0,0,0,0,0,Taui,TauD,LowA,UppA);
   end     
 end

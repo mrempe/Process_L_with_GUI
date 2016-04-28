@@ -184,7 +184,7 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   xmin = datenum(timestampvec(1));
   xmax = datenum(timestampvec(end));
   xlim([xmin xmax])
-  ylabel('Delta power')
+  ylabel([signal ' power'])
   xlabel('Time')
   title(['Best fit of model to ' signal ' power data for file ' filename ' using ' num2str(epoch_length) '-second epochs and a ' model(1) '-state model' ])
   hold off
