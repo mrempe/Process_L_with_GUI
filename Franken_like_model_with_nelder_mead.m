@@ -79,9 +79,18 @@ end
   % UAnormalized = (UA/mn)*100;   % upper asymptote normalized to mean delta power during SWS in last 4hr of baseline
 
 
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
+if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
   [t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes5(datafile,timestampvec,epoch_length);
-disp(['Average delta power: ' num2str(mean(data_at_SWS_midpoints))])
+  % find and remove any NaNs 
+  if sum(find(isnan(data_at_SWS_midpoints)))>0
+    ind_nan = find(isnan(data_at_SWS_midpoints));
+    data_at_SWS_midpoints(ind_nan)=[];
+    t_mdpt_SWS(ind_nan)=[];
+    t_mdpt_indices(ind_nan)=[];
+  end
+
+
+disp(['Average ' signal ' power: ' num2str(mean(data_at_SWS_midpoints))])
 end
 
 % if using a moving window for the upper and lower assymptotes, S
@@ -117,7 +126,7 @@ dt=min(dt);        % only want one value, not a vector. Take the minimum in case
 initial_guess_delta = [2 2];     % one starting guess
 initial_guess_lactate = [0.3 0.3];
 
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
+if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
   [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,t_mdpt_indices,data_at_SWS_midpoints, ...
 								datafile,dt,(LA(1)+UA(1))/2,LA,UA,window_length,timestampvec,0,epoch_length,mask,p),initial_guess_delta,optimset('TolX',1e-3));
 end
@@ -148,7 +157,7 @@ if  strcmp(signal,'lactate')
   %error_instant=run_instant_model(datafile,LA,UA,window_length);
 error_instant = 0;
 end
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
+if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,timestampvec,tL,epoch_length,filename);
 end
 
@@ -160,9 +169,9 @@ disp(['ElapsedTime = ', num2str(ElapsedTime), ' seconds.'])
 %t=0:dt:dt*(size(datafile,1)-1);
 
 
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
+if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
   error_instant=0;  % this won't get set if signal is delta, but the function returns it
-  %figure
+  figure
   %only_sleep_indices=find(datafile(:,1)==1);  
   %sleep_eeg1=datafile(only_sleep_indices,3);
   %sleep_eeg2=datafile(only_sleep_indices,4);
@@ -177,7 +186,7 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   xlim([xmin xmax])
   ylabel('Delta power')
   xlabel('Time')
-  title(['Best fit of model to delta power data for file ' filename ' using ' num2str(epoch_length) '-second epochs and a ' model(1) '-state model' ])
+  title(['Best fit of model to ' signal ' power data for file ' filename ' using ' num2str(epoch_length) '-second epochs and a ' model(1) '-state model' ])
   hold off
 
 

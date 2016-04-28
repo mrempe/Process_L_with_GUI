@@ -1,4 +1,4 @@
-function [Ti,Td,LA,UA,best_error,error_instant,best_S,ElapsedTime]=Franken_like_model(datafile,signal,filename,model,epoch_length,window_length)
+function [Ti,Td,LA,UA,best_error,error_instant,best_S,ElapsedTime]=Franken_like_model(datafile,timestampvec,signal,filename,model,epoch_length,window_length)
 % USAGE:  [Ti,Td,error]=Franken_like_model(datafile,signal)
 %
 % datafile: a sleep data file from Jonathan Wisor where sleep
@@ -24,10 +24,22 @@ tic
 
 %window_length=4; 
 
+if strcmp(signal,'lactate')
+  tL_start_time  = timestampvec(1) + hours(window_length/2);
+  tL_end_time    = timestampvec(end) - hours(window_length/2);
+  indices_start = find(timestampvec>=tL_start_time);  % this handles the case where the start time has been left out due to artifact
+  tL_start_index = indices_start(1);
+  indices_end = find(timestampvec>=tL_end_time);
+  tL_end_index   = indices_end(1);
+  tL = timestampvec(tL_start_index:tL_end_index);
+else 
+  tL =0;
+end
+
 % make a frequency plot, and use it to figure out upper and lower
 % bounds for the model (like Franken et al. 2001 Figure 1)
-[LA,UA]=make_frequency_plot(datafile,window_length,signal,epoch_length);
-
+%[LA,UA]=make_frequency_plot(datafile,window_length,signal,epoch_length);
+[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,0,0);
 
 % -- if using delta power normalize UA and LA to mean SWS delta 
 % -- power in last 4 hours of baseline light period and find 
@@ -54,7 +66,8 @@ tic
 % to by finding all SWS episodes of longer than 5 minutes (like 
 % Franken et al)
 if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
-  [t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes2(datafile,epoch_length);
+ % [t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes2(datafile,epoch_length);
+  [t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes5(datafile,timestampvec,epoch_length);
   disp(['Average delta power: ' num2str(mean(data_at_SWS_midpoints))])
 end
 
@@ -85,8 +98,8 @@ error=zeros(length(tau_i),length(tau_d));
 for i=1:length(tau_i)
   for j=1:length(tau_d)
    
-    S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,tau_i(i),tau_d(j),window_length,0,epoch_length,filename); % run model
-   
+    S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,tau_i(i),tau_d(j),window_length,0,timestampvec,tL,epoch_length); % run model
+    %S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,p(1),p(2),0,0,timestampvec,tL,epoch_length);
     % compute error (depending on if delta power or lactate was used)
     if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
       error(i,j)=sqrt((sum((S([t_mdpt_indices])-data_at_SWS_midpoints).^2))/length(t_mdpt_indices)); %RMSE

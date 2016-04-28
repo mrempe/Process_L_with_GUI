@@ -29,7 +29,7 @@ function S=run_S_model(dataset,dt,S0,LA,UA,ti,td,window_length,makeplot,timestam
 % timestampvec: a datetime vector that contains the times at which we have data (lactate or delta).
 %
 % tL: a datetime vector that contains only those times at which the lactate model can be plotted since it uses a moving window for the lactate signal.
-%     this handles things like artifacts and letting the lactate sensor settle down.  
+%     this handles things like artifacts and letting the lactate sensor settle down.  If lactate is not the signal, tL=0.  
 % 
 % epoch_length: length of 1 epoch in seconds (typically 2,4,8, or 10)
 
@@ -106,6 +106,9 @@ if length(LA)==1
       S(1) = S(size(dataset,1));
     end
 
+
+
+
   %start_value = S(end);
 
   % Testing: use MATLAB's ode45 for updating S
@@ -148,6 +151,7 @@ S = zeros(size(tL));
 S(1) = S0;
   
 % determine a way to index through the data excluding the half-windows at the beginning and the end
+
 l_start_index = find(timestampvec==tL(1));
 
  

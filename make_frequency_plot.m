@@ -22,7 +22,7 @@ if nargin==6 newfig=0; end
 % in the calculation of UA and LA.
 % 
 
-data=datafile(:,2);
+data=datafile(:,2);  % Is this SWA or beta or lactate or what?  
 
 
 % flag for plotting, if 1 you get a plot of the histogram for the
@@ -32,8 +32,8 @@ animation=0;
 
 
 
-
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
+if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') ...
+                           || strcmp(signal,'beta1')  || strcmp(signal,'beta2') || strcmp(signal,'Beta1') || strcmp(signal,'Beta2')
   % If using delta power like Franken 2001 does, 
   % to find LA (lower assymptote), the intersection of the REM
   % histogram and SWS histogram
@@ -41,8 +41,7 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   % Find all the rows where sleep state is SWS (denoted by a 1)
   %rowsleep=find(datafile(:,1)==1);
   sleepdata=data(datafile(:,1)==1);
- 
-
+  
   % Find all the rows where sleep state is REM (denoted by a 2)
   %rowrem=find(datafile(:,1)==2);
   remdata=data(datafile(:,1)==2);
@@ -51,9 +50,20 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   %rowwake=find(datafile(:,1)==0);
   wakedata=data(datafile(:,1)==0);
 
-% size(datafile)
-% size(sleepdata)
-% max(sleepdata)  
+  
+  % Generate an error if any of the three data vectors are empty (meaning that state did )
+  if(isempty(sleepdata))
+    error('No epochs marked as Slow Wave sleep during the requested segment')
+  end
+
+  if(isempty(remdata))
+    error('No epochs marked as REM sleep during the requested segment')
+  end
+
+  if(isempty(wakedata))
+    error('No epochs marked as wake during the requested segment')
+  end
+
   xbins=linspace(0,max(sleepdata),30);
   
 
@@ -65,17 +75,24 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
                                   % vector, (keep only last one)
   max_REM_loc = xr(find(nr==max(nr)));
   max_SWS_loc = xs(find(ns==max(ns)));
+  max_REM_loc = max_REM_loc(end);   % in case there are more than one.
+  max_SWS_loc = max_SWS_loc(end);   % in case there are more than one. 
 
   % New method to find crossing of REM and SWS histograms.
   % First find all of the crossing (some of these may be way off in the tails)
   % Then choose the one that is between the maximums of each curve
   LA = xs(id)-(difference(id).*(xs(id+1)-xs(id))./(difference(id+1)-difference(id)));
+  
   index_crossing_between_maxREM_andmaxSWS = find(LA>max_REM_loc & LA<max_SWS_loc);
-  if ~isempty(index_crossing_between_maxREM_andmaxSWS) 
+  if ~isempty(index_crossing_between_maxREM_andmaxSWS) & numel(index_crossing_between_maxREM_andmaxSWS)==1 
     LA = LA(index_crossing_between_maxREM_andmaxSWS);
+  elseif ~isempty(index_crossing_between_maxREM_andmaxSWS) & numel(index_crossing_between_maxREM_andmaxSWS)>1 % more than one crossing between peaks
+    LA = LA(mean(index_crossing_between_maxREM_andmaxSWS));  % take the average
   else                        % if the two histograms don't cross between their maximums
-   LA=xr(find(nr==max(nr)));  % set to max value in REMS histogram 
+    LA=xr(find(nr==max(nr)));  % set to max value in REMS histogram 
+    LA=LA(end);   % in case there are two maximums that are exactly the same, pick the larger one.
   end
+
 
   % if(isempty(id)) % if they don't cross
   %   loc=find(nr>0);  % find non-zero bins of REM

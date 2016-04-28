@@ -3,7 +3,7 @@ function errorout = myobjectivefunction(signal,t_mdpt_indices,data_at_SWS_midpoi
 
 
 
-  if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2')
+  if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
     Simulation = run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,p(1),p(2),0,0,timestampvec,tL,epoch_length);
     errorout   = sqrt((sum((Simulation([t_mdpt_indices])-data_at_SWS_midpoints).^2))/length(t_mdpt_indices)); %RMSE
   	errorout = errorout/(max(data_at_SWS_midpoints)-min(data_at_SWS_midpoints));  %NRMSE (normalized root-mean-square deviation)

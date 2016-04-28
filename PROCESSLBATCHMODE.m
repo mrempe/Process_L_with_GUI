@@ -45,12 +45,13 @@ if ~iscell(files), files = {files}; end
 
 
 
-prompt = {'Do you want to use EEG1, EEG2, or lactate?', ...
+prompt = {'Do you want to use delta power in channel 1 (EEG1), delta power in channel 2 (EEG2), beta1, beta2, or lactate?', ...
 'Do you want to use BruteForce or NelderMead?','Do you want to rescore the data into Quiet Wake and Active Wake and use a 5-state model rather than a 3-state model?  (1 for yes, 0 for no)', ...
 'Do you want to restrict the data using hours from the beginning of the recording? (1 for yes, 0 for no)', ...
 'Do you want to restrict the data to be between two specific times? (1 for yes, 0 for no)', ...
+'Do you want to restrict the data using epochs from the beginning of the recording? (1 for yes, 0 for no)', ...
 'Would you like to write the optimal tau values to a file with a Data Source Info Tab? (1 for yes, 0 for no)'};
-defaults = {'EEG2','NelderMead','0','0','0','0'}; 
+defaults = {'EEG2','NelderMead','0','0','0','0','0'}; 
 dlg_title = 'Input';
 inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
 
@@ -60,7 +61,8 @@ algorithm = inputs{2};
 do_rescore = str2double(inputs{3});
 do_restrict_hours_from_start = str2double(inputs{4});
 do_restrict_start_time_end_time = str2double(inputs{5});
-do_write_tau_values_to_file = str2double(inputs{6});
+do_restrict_using_epochs = str2double(inputs{6});
+do_write_tau_values_to_file = str2double(inputs{7});
 
 if do_rescore == 1
   model = '5state';
@@ -69,6 +71,15 @@ elseif do_rescore == 0
 else
   error('You entered something other than 0 or 1 for rescoring into QW and AW')
 end
+
+if strcmp(signal,'Beta1')
+  signal = 'beta1';    % make lowercase so I don't have to have all 4 cases everywhere
+end 
+if strcmp(signal,'Beta2')
+  signal = 'beta2';
+end
+
+
 
 % % Handle the case where a keyword is given
 % if use_keyword == 1
@@ -105,14 +116,24 @@ if do_restrict_start_time_end_time == 1
 
 end
 
+if do_restrict_using_epochs == 1
+  prompt5    = {'Please enter a start in epochs from the beginning of the recording', 'Ending time (in epochs from beginning of recording)'};
+  defaults5  = {'1','8640'};
+  dlg_title5 = 'How do you want to restrict the data? ';
+  restrict_input = inputdlg(prompt5,dlg_title5,1,defaults5);
+  restrict_epochs_from_start = [str2double(restrict_input{1}) str2double(restrict_input{2})];
+else 
+  restrict_epochs_from_start = 'none';
+end 
 
 SkipString='07:00:00';
 occurence = 2;  % start at the second occurance of SkipString
 
 
 
-if ~strcmp(signal,'lactate') && ~strcmp(signal,'delta1') && ~strcmp(signal,'delta2') && ~strcmp(signal,'EEG1') && ~strcmp(signal,'EEG2')
-  error('Input signal must be one of the following: ''lactate'', ''delta1'', ''delta2'', ''EEG1'', or ''EEG2''')
+if ~strcmp(signal,'lactate') && ~strcmp(signal,'delta1') && ~strcmp(signal,'delta2') ... 
+  && ~strcmp(signal,'EEG1') && ~strcmp(signal,'EEG2') && ~strcmp(signal,'beta1') && ~strcmp(signal,'beta2')  && ~strcmp(signal,'Beta1') && ~strcmp(signal,'Beta2') 
+  error('Input signal must be one of the following: ''lactate'', ''delta1'', ''delta2'', ''EEG1'', ''EEG2'', ''beta1'' or ''beta2'' ')
 end
 
 
@@ -148,31 +169,46 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
  
  
 
+% If a restriction is requested, do that first
+  if do_restrict_using_epochs
+    start_index = restrict_epochs_from_start(1);
+    end_index = restrict_epochs_from_start(2);
+  else 
+    start_index = 1;
+    end_index = Inf;
+  end
+
+
   %[data,textdata]=importdatafile(files(FileCounter).name,directory);%importfile returns data (a matrix) and textdata (a cell array)
-  [data,textdata]=importdatafile(files{FileCounter},directory);%importfile returns data (a matrix) and textdata (a cell array)
+  [data,textdata]=importdatafile(files{FileCounter},directory,start_index,end_index);%importfile returns data (a matrix) and textdata (a cell array)
 
   % if data and/or textdata have empty cells, remove those epochs
-  emptycells = cellfun(@isempty,textdata(:,1));
-  textdata(emptycells,:) = [];      % remove all epochs that are empty
-  data(emptycells,:)     = [];
+  emptycells_textdata = cellfun(@isempty,textdata(:,1));
+  %emptycells_data = cellfun(@isempty,data(:,1));  
+  textdata(emptycells_textdata,:) = [];      % remove all epochs that are empty
+  data(emptycells_textdata,:)     = [];
+  % textdata(emptycells_data,:) = [];      % remove all epochs that are empty
+  % data(emptycells_data,:)     = [];
 
 
 
 
-  if ~isempty(strfind(SkipString,':'))
-    for i=1:length(textdata)
-      SkipString_occurence_vec{i} = strfind(char(textdata(i,1)),SkipString);
-    end
-    locs = ~cellfun('isempty',SkipString_occurence_vec);
-    StartLine(FileCounter) = max(find(locs,occurence));  
-  else
-    StartLine(FileCounter) = 1;
-  end
+
+  % if ~isempty(strfind(SkipString,':'))
+  %   for i=1:length(textdata)
+  %     SkipString_occurence_vec{i} = strfind(char(textdata(i,1)),SkipString);
+  %   end
+  %   locs = ~cellfun('isempty',SkipString_occurence_vec);
+  %   StartLine(FileCounter) = max(find(locs,occurence));  
+  % else
+  %   StartLine(FileCounter) = 1;
+  % end
 
 
 
   display(files{FileCounter}) % One matrix (textdata) holds the date/time stamp and sleep state.  The other (data) holds the lactate and EEG data.
   
+
 
   % Compute the length of one epoch here using TimeStampMatrix
   % I used to just compute the difference in seconds between first time stamp and second,
@@ -217,7 +253,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
   timestampvec{FileCounter} = datetime(Y,M,D,H,m,s);  % this is a datetime vector with all the timestamps in it. Use it to plot and drop elements from this vector where artifacts happen
   if min(diff(timestampvec{FileCounter})) < 0
-    error('Time Stamp error: negative dt value')
+    warning('Time Stamp error: negative dt value')
   end
 
   window_length = 4;      % length of moving window used to compute UA and LA if signal is lactate.  
@@ -260,6 +296,8 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
       PhysioVars(i,1)=2;
     elseif sum(textdata{i,2}=='Tr')==2
       PhysioVars(i,1)=0;                 % call transitions wake
+    elseif textdata{i,2}=='T'
+      PhysioVars(i,1)=5;
     elseif textdata{i,2}=='X'            %artefact
       PhysioVars(i,1)=5; 
         else   
@@ -294,6 +332,9 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
       EEG2(i)=~isempty(strfind(HeadChars(i,:),'EEG2'));
     end
     onetotwo(i)=~isempty(strfind(HeadChars(i,:),'1-2 '));
+    fifteentosixteen(i)=~isempty(strfind(HeadChars(i,:),'15-16 '));
+    thirtyfourtothirtyfive(i)=~isempty(strfind(HeadChars(i,:),'34-35 '));
+
     EMG(i)=~isempty(strfind(HeadChars(i,:),'EMG'));
   end
   
@@ -310,12 +351,21 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
   EEG1_1to2Hzcolumn = intersect(find(EEG1),find(onetotwo))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
   EEG2_1to2Hzcolumn = intersect(find(EEG2),find(onetotwo))-2;
+  EEG1_15to16Hzcolumn = intersect(find(EEG1),find(fifteentosixteen))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
+  EEG2_15to16Hzcolumn = intersect(find(EEG2),find(fifteentosixteen))-2;
+  EEG1_34to35Hzcolumn = intersect(find(EEG1),find(thirtyfourtothirtyfive))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
+  EEG2_34to35Hzcolumn = intersect(find(EEG2),find(thirtyfourtothirtyfive))-2;
+
+
   EMG_column = find(EMG)-2;
   EMG_column = EMG_column(1);  % in case there are more than one columns with EMG in header, take the first one.
 
 
   PhysioVars(:,3) = mean(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
   PhysioVars(:,4) = mean(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
+  PhysioVars(:,5) = sum(data(:,EEG1_15to16Hzcolumn:EEG1_34to35Hzcolumn),2);  % NeuroScore uses sum when you output beta as a column
+  PhysioVars(:,6) = sum(data(:,EEG2_15to16Hzcolumn:EEG2_34to35Hzcolumn),2);  
+
 
   % EMG data 
   EMG_data = data(:,EMG_column);
@@ -418,7 +468,8 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   PhysioVars(:,2) = LactateSmoothed;
   PhysioVars(:,3) = medianfiltervectorized(PhysioVars(:,3),2); 
   PhysioVars(:,4) = medianfiltervectorized(PhysioVars(:,4),2);
-  
+  PhysioVars(:,5) = medianfiltervectorized(PhysioVars(:,5),2);  % Beta EEG1
+  PhysioVars(:,6) = medianfiltervectorized(PhysioVars(:,6),2);  % Beta EEG2
 
 
   if strcmp(model,'5state')
@@ -438,6 +489,10 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     signal_data{FileCounter} = PhysioVars(:,3);
   elseif strcmp(signal,'delta2') || strcmp(signal,'EEG2')
     signal_data{FileCounter} = PhysioVars(:,4);
+  elseif strcmp(signal,'beta1') || strcmp(signal,'Beta1')
+    signal_data{FileCounter} = PhysioVars(:,5);
+  elseif strcmp(signal,'beta2') || strcmp(signal,'Beta2')
+    signal_data{FileCounter} = PhysioVars(:,6);
   end
 
 
@@ -470,30 +525,30 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   if ~ischar(restrict_hours_from_start) && numel(restrict_hours_from_start)==2
     dt = 1/(60*60/epoch_length_in_seconds(FileCounter));
     t  = 0:dt:dt*(size(signal_data{FileCounter},1)-1);
-    if strcmp(signal,'lactate')             % include window_length/2 hours of data on either side 
-      if restrict(1)-(window_length)/2 > 0      % check lower edge
-        start_index = find(abs(t-(restrict(1)-(window_length/2)))<1e-12);
-      else
-        start_index = find(abs(t-restrict(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
-      end
-      if restrict(2) + (window_length)/2 > t(end)   % check upper edge
-        end_index = find(abs(t-(restrict(2)+(window_length/2)))<1e-12);
-      else
-        if restrict(2) > t(end)
-          end_index = length(t);
-        else 
-          end_index = find(abs(t-restrict(2))<1e-12);
-        end
-      end
-    end
-    if ~strcmp(signal,'lactate')
-      start_index = find(abs(t-restrict(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
-      if restrict(2) > t(end)
+    % if strcmp(signal,'lactate')             % include window_length/2 hours of data on either side 
+    %   if restrict_hours_from_start(1)-(window_length)/2 > 0      % check lower edge
+    %     start_index = find(abs(t-(restrict_hours_from_start(1)-(window_length/2)))<1e-12);
+    %   else
+    %     start_index = find(abs(t-restrict_hours_from_start(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
+    %   end
+    %   if restrict_hours_from_start(2) + (window_length)/2 > t(end)   % check upper edge
+    %     end_index = find(abs(t-(restrict_hours_from_start(2)+(window_length/2)))<1e-12);
+    %   else
+    %     if restrict_hours_from_start(2) > t(end)
+    %       end_index = length(t);
+    %     else 
+    %       end_index = find(abs(t-restrict_hours_from_start(2))<1e-12);
+    %     end
+    %   end
+    % end
+    % if ~strcmp(signal,'lactate')
+      start_index = find(abs(t-restrict_hours_from_start(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
+      if restrict_hours_from_start(2) > t(end)
         end_index = length(t);
       else 
-        end_index = find(abs(t-restrict(2))<1e-12);
+        end_index = find(abs(t-restrict_hours_from_start(2))<1e-12);
       end
-    end
+    % end
   else
     start_index = 1;                                % If no restriction
     end_index = size(signal_data{FileCounter},1);
@@ -507,7 +562,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     locs_start  = ~cellfun('isempty',start_string_occurence_vec);
     start_index = max(find(locs_start,start_time_occurence)); 
     
-    if restrict_end_clock_time =='end'
+    if strcmp(restrict_end_clock_time,'end')
       end_index = size(signal_data{FileCounter},1);
     else
       for i=1:length(textdata)
@@ -670,18 +725,20 @@ if do_write_tau_values_to_file
   output_directory = strcat(directory,'Tau_values_output_',date_time);
   mkdir(output_directory)
 
-Taui
-TauD
+
 
   if do_restrict_hours_from_start
     write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
-                             restrict_hours_from_start,0,0,Taui,TauD);
+                             do_restrict_using_epochs,restrict_hours_from_start,0,0,0,0,Taui,TauD,LowA,UppA);
   elseif do_restrict_start_time_end_time
     write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
-                             0,restrict_start_clock_time,restrict_end_clock_time,Taui,TauD);
+                             do_restrict_using_epochs,0,restrict_start_clock_time,restrict_end_clock_time,0,0,Taui,TauD,LowA,UppA);
+  elseif do_restrict_using_epochs
+    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
+                             do_restrict_using_epochs,restrict_hours_from_start,0,0,restrict_epochs_from_start(1),restrict_epochs_from_start(2),Taui,TauD,LowA,UppA);       
   else
     write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
-                             0,0,0,Taui,TauD);
+                             do_restrict_using_epochs,0,0,0,0,0,Taui,TauD,LowA,UppA);
   end     
 end
 
