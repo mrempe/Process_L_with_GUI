@@ -37,6 +37,7 @@ function [Ti,Td,LA,UA,best_error,error_instant,best_S,ElapsedTime]=Franken_like_
 % in the last 4 hours of the baseline light period
 
 tic
+signal
 
 
 %window_length=4;  % size of moving window (in hours) used to compute

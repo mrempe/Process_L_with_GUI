@@ -124,7 +124,7 @@ occurence = 2;  % start at the second occurance of SkipString
 
 
 
-if ~strcmp(signal,'lactate') && ~strcmp(signal,'delta1') && ~strcmp(signal,'delta2') && ~strcmp(signal,'EEG1') && ~strcmp(signal,'EEG2')
+if ~strcmp(signal.name,'lactate') && ~strcmp(signal.name,'delta1') && ~strcmp(signal.name,'delta2') && ~strcmp(signal.name,'EEG1') && ~strcmp(signal.name,'EEG2')
   error('Input signal must be one of the following: ''lactate'', ''delta1'', ''delta2'', ''EEG1'', or ''EEG2''')
 end
 
@@ -335,7 +335,9 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   EMG_data = data(:,EMG_column);
 
 
-
+max(PhysioVars(:,3))
+min(PhysioVars(:,3))
+pause
 
 
 
@@ -374,27 +376,27 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
   % Exclude artifacts in EEG that were not marked as X, but where SWA is at least 3 SDs away from
   % the mean for this animal.
-  sleep_epochs = find(PhysioVars(:,1)==1);
-  SWA1_during_sleep = PhysioVars(sleep_epochs,3);
-  SWA2_during_sleep = PhysioVars(sleep_epochs,4);
-  SWA1_outliers_indices = find(SWA1_during_sleep>=(mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)));
-  SWA2_outliers_indices = find(SWA2_during_sleep>=(mean(SWA2_during_sleep)+3*std(SWA2_during_sleep)));
+  % sleep_epochs = find(PhysioVars(:,1)==1);
+  % SWA1_during_sleep = PhysioVars(sleep_epochs,3);
+  % SWA2_during_sleep = PhysioVars(sleep_epochs,4);
+  % SWA1_outliers_indices = find(SWA1_during_sleep>=(mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)));
+  % SWA2_outliers_indices = find(SWA2_during_sleep>=(mean(SWA2_during_sleep)+3*std(SWA2_during_sleep)));
   
-  if strcmp(signal,'delta1') | strcmp(signal,'EEG1') 
-    PhysioVars(sleep_epochs(SWA1_outliers_indices),:)=[];
-    data(sleep_epochs(SWA1_outliers_indices),:)=[];
-    textdata(sleep_epochs(SWA1_outliers_indices),:)=[];
-    timestampvec{FileCounter}(sleep_epochs(SWA1_outliers_indices))=[];
-    EMG_data(sleep_epochs(SWA1_outliers_indices))=[];
-  end
+  % if strcmp(signal.name,'delta1') | strcmp(signal.name,'EEG1') 
+  %   PhysioVars(sleep_epochs(SWA1_outliers_indices),:)=[];
+  %   data(sleep_epochs(SWA1_outliers_indices),:)=[];
+  %   textdata(sleep_epochs(SWA1_outliers_indices),:)=[];
+  %   timestampvec{FileCounter}(sleep_epochs(SWA1_outliers_indices))=[];
+  %   EMG_data(sleep_epochs(SWA1_outliers_indices))=[];
+  % end
 
-  if strcmp(signal,'delta2') | strcmp(signal,'EEG2')
-    PhysioVars(SWA2_outliers_indices,:)=[];
-    data(SWA2_outliers_indices,:)=[];
-    textdata(SWA2_outliers_indices,:)=[];
-    timestampvec{FileCounter}(SWA2_outliers_indices)=[];
-    EMG_data(sleep_epochs(SWA2_outliers_indices))=[];
-  end 
+  % if strcmp(signal.name,'delta2') | strcmp(signal.name,'EEG2')
+  %   PhysioVars(SWA2_outliers_indices,:)=[];
+  %   data(SWA2_outliers_indices,:)=[];
+  %   textdata(SWA2_outliers_indices,:)=[];
+  %   timestampvec{FileCounter}(SWA2_outliers_indices)=[];
+  %   EMG_data(sleep_epochs(SWA2_outliers_indices))=[];
+  % end 
 
   %  % Uncomment these lines if you want to plot the histograms of delta activity during SWS
   %  [n1,x1]=hist(SWA1_during_sleep,linspace(0,max(SWA1_during_sleep),30));
@@ -445,17 +447,17 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   end
 
 
-  if strcmp(signal,'lactate')
+  if strcmp(signal.name,'lactate')
     signal_data{FileCounter} = PhysioVars(:,2);
-  elseif strcmp(signal,'delta1') || strcmp(signal,'EEG1')
+  elseif strcmp(signal.name,'delta1') || strcmp(signal.name,'EEG1')
     signal_data{FileCounter} = PhysioVars(:,3);
-  elseif strcmp(signal,'delta2') || strcmp(signal,'EEG2')
+  elseif strcmp(signal.name,'delta2') || strcmp(signal.name,'EEG2')
     signal_data{FileCounter} = PhysioVars(:,4);
   end
 
 
 % Remove all epochs of data where the lactate signal is negative (if using lactate as the signal)
-  if strcmp(signal,'lactate')
+  if strcmp(signal.name,'lactate')
     locations=find(data(:,1)<0);
     data(locations,:)=[];
     textdata(locations,:)=[];
@@ -483,7 +485,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   if ~ischar(restrict_hours_from_start) && numel(restrict_hours_from_start)==2
     dt = 1/(60*60/epoch_length_in_seconds(FileCounter));
     t  = 0:dt:dt*(size(signal_data{FileCounter},1)-1);
-    if strcmp(signal,'lactate')             % include window_length/2 hours of data on either side 
+    if strcmp(signal.name,'lactate')             % include window_length/2 hours of data on either side 
       if restrict(1)-(window_length)/2 > 0      % check lower edge
         start_index = find(abs(t-(restrict(1)-(window_length/2)))<1e-12);
       else
@@ -499,7 +501,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
         end
       end
     end
-    if ~strcmp(signal,'lactate')
+    if ~strcmp(signal.name,'lactate')
       start_index = find(abs(t-restrict(1))<1e-12);  %where t=restrict(1) with some tolerance for round-off
       if restrict(2) > t(end)
         end_index = length(t);
@@ -592,7 +594,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   % Find the first two NREM episodes of at least 1 minute, and start 
   % the simulation at the end of the second 1-minute NREM episode
   % ----
-  if strcmp(signal,'lactate') && (strcmp(restrict_hours_from_start,'none') || restrict_hours_from_start(1)==0)
+  if strcmp(signal.name,'lactate') && (strcmp(restrict_hours_from_start,'none') || restrict_hours_from_start(1)==0)
     ind_of_second_NREM_episode_end = find_first_two_NREM_episodes(state_data{FileCounter});
     state_data{FileCounter}  = state_data{FileCounter}(ind_of_second_NREM_episode_end:end);
     signal_data{FileCounter} = signal_data{FileCounter}(ind_of_second_NREM_episode_end:end);
@@ -631,10 +633,14 @@ for FileCounter=1:length(files)
   disp(['File number ', num2str(FileCounter), ' of ', num2str(length(files))])
   display(files{FileCounter})
   if strcmp(algorithm,'NelderMead')  
-    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
+    max(signal_data{1})
+    min(signal_data{1})
+    std(signal_data{1})
+    pause
+    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal.name,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
   end
   if strcmp(algorithm,'BruteForce')
-    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
+    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal.name,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
   end
 
   residual(FileCounter) = best_error;
@@ -662,7 +668,7 @@ for FileCounter=1:length(files)
 % make a bar graph showing the error in the model and the error using 
 % the instant model that follows the lactate upper and lower bounds and 
 % switches in-between them if the sleep state changes
-% if strcmp(signal,'lactate')
+% if strcmp(signal.name,'lactate')
 %   figure
 %   bar([1,2],[mean(Error)/mean(Error) mean(Error2)/mean(Error)])
 %   set(gca,'XTickLabel',{'Model fit','instant model'})
@@ -684,11 +690,11 @@ if do_write_tau_values_to_file
 
 
   if do_restrict_hours_from_start
-    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
+    write_tau_values_to_file(files,directory,model,signal.name,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ... 
                              restrict_hours_from_start,0,0,Taui,TauD)
   end
   if do_restrict_start_time_end_time
-    write_tau_values_to_file(files,directory,model,signal,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
+    write_tau_values_to_file(files,directory,model,signal.name,algorithm,do_rescore,do_restrict_hours_from_start,do_restrict_start_time_end_time, ...
                              0,restrict_start_clock_time,restrict_end_clock_time,Taui,TauD)
   end
 

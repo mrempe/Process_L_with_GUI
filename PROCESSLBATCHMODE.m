@@ -46,20 +46,28 @@ if ~iscell(files), files = {files}; end
 
 
 prompt = {'Do you want to use delta power in channel 1 (EEG1), delta power in channel 2 (EEG2), beta1, beta2, or lactate?', ...
-'Do you want to define a custom range of frequencies to define SWA?', ...
+'If not using lactate, which range of frequencies do you want to use to define SWA?  (write in the format ''1-4'')', ...
 'Do you want to use BruteForce or NelderMead?', ...
 'Do you want to rescore the data into Quiet Wake and Active Wake and use a 5-state model rather than a 3-state model?  (1 for yes, 0 for no)', ...
 'Do you want to restrict the data using hours from the beginning of the recording? (1 for yes, 0 for no)', ...
 'Do you want to restrict the data to be between two specific times? (1 for yes, 0 for no)', ...
 'Do you want to restrict the data using epochs from the beginning of the recording? (1 for yes, 0 for no)', ...
 'Would you like to write the optimal tau values to a file with a Data Source Info Tab? (1 for yes, 0 for no)'};
-defaults = {'EEG2','0','NelderMead','0','0','0','0','0'}; 
+defaults = {'EEG2','1-4','NelderMead','0','0','0','0','0'}; 
 dlg_title = 'Input';
 inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
 
 
-signal.name=inputs{1};
-define_freq_range_yesno = inputs{2};
+signal.name = inputs{1};
+define_freq_range_yesno = str2double(inputs{2});
+[low_freq_bound,high_freq_bound] = strtok(inputs{2},'-');
+high_freq_bound = high_freq_bound(2:end);
+signal.freq_range(1) = str2num(low_freq_bound);
+signal.freq_range(2) = str2num(high_freq_bound);
+if strcmp(signal,'lactate')
+  signal.freq_range = [];
+end 
+
 algorithm = inputs{3};
 do_rescore = str2double(inputs{4});
 do_restrict_hours_from_start = str2double(inputs{5});
@@ -96,21 +104,21 @@ end
 % end
 
 % Handle the case where a custom frequency range is input for Slow Wave Activity
-if define_freq_range_yesno == 1
-  prompt23    = {'Lower value for the range of frequencies (at least 1)', 'Upper value for the range of frequencies (at most 8)'};
-  defaults23  = {'1','4'};
-  dlg_title23 = 'Define the frequency range for Slow Wave Activity';
-  freq_range_input = inputdlg(prompt23,dlg_title23,1,defaults23,'on');
-  freq_range = [str2double(freq_range_input{1}) str2double(freq_range_input{2})];
-else
-  freq_range = [1 4];   % default is 1-4 Hz
-end 
+% if define_freq_range_yesno == 1
+%   prompt23    = {'Lower value for the range of frequencies (at least 1)', 'Upper value for the range of frequencies (at most 8)'};
+%   defaults23  = {'1','4'};
+%   dlg_title23 = 'Define the frequency range for Slow Wave Activity';
+%   freq_range_input = inputdlg(prompt23,dlg_title23,1,defaults23,'on');
+%   freq_range = [str2double(freq_range_input{1}) str2double(freq_range_input{2})];
+% else
+%   freq_range = [1 4];   % default is 1-4 Hz
+% end 
 
-if strcmp(signal,'lactate')
-  signal.freq_range = [];
-else 
-  signal.freq_range = freq_range;
-end
+% if strcmp(signal,'lactate')
+%   signal.freq_range = [];
+% else 
+%   signal.freq_range = freq_range;
+% end
 
 
 % Handle the case where a restriction is given in terms of hours from the beginning of recording.  
@@ -297,30 +305,30 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
                                                        
  
-  PhysioVars=zeros(size(data,1),4);  % PhysioVars columns contain: SleepState, lactate, delta power in EEG1, delta power in EEG2 
  
+  sleep_state = zeros(size(data,1),1);  % Sleep state contains 0 for Wake, 1 for SWS, 2 for REMS, 5 for artifact
 
   missing_values=0;
   for i = 1: size(data,1)  
     
     if isempty(textdata{i,2})==1        % call unscored epochs wake
       missing_values=missing_values+1;
-      PhysioVars(i,1)=0;  
+      sleep_state(i)=0;  
 
     elseif textdata{i,2}=='W' 
-      PhysioVars(i,1)=0;
+      sleep_state(i)=0;
     elseif textdata{i,2}=='S'
-      PhysioVars(i,1)=1;
+      sleep_state(i)=1;
     elseif textdata{i,2}=='P'
-      PhysioVars(i,1)=2;
+      sleep_state(i)=2;
     elseif textdata{i,2}=='R'
-      PhysioVars(i,1)=2;
+      sleep_state(i)=2;
     elseif sum(textdata{i,2}=='Tr')==2
-      PhysioVars(i,1)=0;                 % call transitions wake
+      sleep_state(i)=0;                 % call transitions wake
     elseif textdata{i,2}=='T'
-      PhysioVars(i,1)=5;
+      sleep_state(i)=5;
     elseif textdata{i,2}=='X'            %artefact
-      PhysioVars(i,1)=5; 
+      sleep_state(i)=5; 
         else   
           error('I found a sleep state that wasn''t W,S,P,R,Tr, or X');
     end
@@ -329,11 +337,6 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
  
 
-  % if strcmp(signal,'lactate') 
-  %   PhysioVars(:,2)=LactateSmoothed;
-  % disp(['Average lactate power: ' num2str(mean(PhysioVars(:,2)))])
-  % else PhysioVars(:,2)=data(:,1);
-  % end
   
   % Find the columns with EEG1 1-2 Hz and EEG2 1-2 Hz  
   fid = fopen(strcat(directory,files{FileCounter}));
@@ -348,13 +351,19 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     if sum(EEG1(i))==0
       EEG1(i)=~isempty(strfind(HeadChars(i,:),'EEG1'));  % handle 'EEG 1' or 'EEG1'
     end
+    if sum(EEG1(i))==0
+      EEG1(i)=~isempty(strfind(HeadChars(i,:),'EEG '));  % handle the case where only one EEG is present, called EEG followed by a space
+    end 
+    if sum(EEG1(i))==0
+      EEG1(i)=~isempty(strfind(HeadChars(i,:),'EEG('));  % handle the case where only one EEG is present, called EEG, no space
+    end 
     EEG2(i)=~isempty(strfind(HeadChars(i,:),'EEG 2'));
     if sum(EEG2(i))==0
       EEG2(i)=~isempty(strfind(HeadChars(i,:),'EEG2'));
     end
     onetotwo(i)               =~ isempty(strfind(HeadChars(i,:),'1-2 '));
-    fifteentosixteen(i)       =~ isempty(strfind(HeadChars(i,:),'15-16 '));
-    thirtyfourtothirtyfive(i) =~ isempty(strfind(HeadChars(i,:),'34-35 '));
+    custom_column1(i)         =~ isempty(strfind(HeadChars(i,:),['(' num2str(signal.freq_range(1)) '-'  ]));
+    custom_column2(i)         =~ isempty(strfind(HeadChars(i,:),['-' num2str(signal.freq_range(2)) ')']));
 
     EMG(i)=~isempty(strfind(HeadChars(i,:),'EMG'));
   end
@@ -372,44 +381,38 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
   EEG1_1to2Hzcolumn = intersect(find(EEG1),find(onetotwo))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
   EEG2_1to2Hzcolumn = intersect(find(EEG2),find(onetotwo))-2;
-  EEG1_15to16Hzcolumn = intersect(find(EEG1),find(fifteentosixteen))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
-  EEG2_15to16Hzcolumn = intersect(find(EEG2),find(fifteentosixteen))-2;
-  EEG1_34to35Hzcolumn = intersect(find(EEG1),find(thirtyfourtothirtyfive))-2; % subtract 2 to account for the fact that the first two columns are timestamp and lactate
-  EEG2_34to35Hzcolumn = intersect(find(EEG2),find(thirtyfourtothirtyfive))-2;
+  
+  EEG1_low_custom_column = intersect(find(EEG1),find(custom_column1))-2;
+  EEG1_high_custom_column = intersect(find(EEG1),find(custom_column2))-2;
+  EEG2_low_custom_column = intersect(find(EEG2),find(custom_column1))-2;
+  EEG2_high_custom_column = intersect(find(EEG2),find(custom_column2))-2;
 
+
+
+  EEG1_1to2Hzcolumn = EEG1_1to2Hzcolumn(1); % In case there are more than one column labeled EEG or EEG1
+  EEG1_low_custom_column  = EEG1_low_custom_column(1);
+  EEG1_high_custom_column = EEG1_high_custom_column(1);
+  
+  if strcmp(signal,'EEG2')
+    EEG2_1to2Hzcolumn = EEG2_1to2Hzcolumn(1);
+    EEG2_low_custom_column  = EEG2_low_custom_column(1);
+    EEG2_high_custom_column = EEG2_high_custom_column(1);
+  end 
 
   EMG_column = find(EMG)-2;
   EMG_column = EMG_column(1);  % in case there are more than one columns with EMG in header, take the first one.
 
 
-  PhysioVars(:,3) = mean(data(:,EEG1_1to2Hzcolumn:EEG1_1to2Hzcolumn+2),2);  %the plus 2 means add the values in the columns for 1-2,2-3 and 3-4 Hz
-  PhysioVars(:,4) = mean(data(:,EEG2_1to2Hzcolumn:EEG2_1to2Hzcolumn+2),2);  % I have done mean or sum for this. Doesn't seem to matter much. 
-  PhysioVars(:,5) = sum(data(:,EEG1_15to16Hzcolumn:EEG1_34to35Hzcolumn),2);  % NeuroScore uses sum when you output beta as a column
-  PhysioVars(:,6) = sum(data(:,EEG2_15to16Hzcolumn:EEG2_34to35Hzcolumn),2);  
-  PhysioVars(:,7) = sum(data(:,low_custom_column:high_custom_column),2);
-
   % EMG data 
   EMG_data = data(:,EMG_column);
 
+  % EEG data
+  if strcmp(signal.name,'EEG1') 
+    EEG_data = mean(data(:,EEG1_low_custom_column:EEG1_high_custom_column),2);
+  elseif strcmp(signal.name,'EEG2')
+    EEG_data = mean(data(:,EEG2_low_custom_column:EEG2_high_custom_column),2);
+  end 
 
-
-
-
-
-
-  % PhysioVars(:,3) = mean(data(:,3:5),2);     % as many rows as there are rows in the input file, EEG1 delta power (1-4Hz) 
-  % if size(data,2) == 82
-  %   PhysioVars(:,4) = mean(data(:,43:45),2);   % EEG2 delta power (1-4Hz) if .txt file goes up to 40 Hz
-  % elseif size(data,2) == 44
-  %   PhysioVars(:,4) = mean(data(:,24:26),2); % EEG2 delta power (1-4Hz) if .txt file goes up to 20 Hz
-  % end
-
-  % d1smoothed = medianfiltervectorized(PhysioVars(:,3),2); 
-  % d2smoothed = medianfiltervectorized(PhysioVars(:,4),2);
-  
-  % PhysioVars(:,3) = d1smoothed;
-  % PhysioVars(:,4) = d2smoothed;
-  
 
 
  % Handle artifacts (now I just remove these epochs from the simulations)
@@ -420,8 +423,9 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
 
   % Remove all epochs marked as artifact (X in txt file, 5 in PhysioVars)
-  locationsX=find(PhysioVars(:,1)==5);
-  PhysioVars(locationsX,:)=[];
+  locationsX=find(sleep_state==5);
+  sleep_state(locationsX)=[];
+  EEG_data(locationsX,:)=[];
   data(locationsX,:)=[];
   textdata(locationsX,:)=[];
   timestampvec{FileCounter}(locationsX)=[];
@@ -432,27 +436,27 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
 
   % Exclude artifacts in EEG that were not marked as X, but where SWA is at least 3 SDs away from
   % the mean for this animal.
-  sleep_epochs = find(PhysioVars(:,1)==1);
-  SWA1_during_sleep = PhysioVars(sleep_epochs,3);
-  SWA2_during_sleep = PhysioVars(sleep_epochs,4);
-  SWA1_outliers_indices = find(SWA1_during_sleep>=(mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)));
-  SWA2_outliers_indices = find(SWA2_during_sleep>=(mean(SWA2_during_sleep)+3*std(SWA2_during_sleep)));
+  % sleep_epochs = find(PhysioVars(:,1)==1);
+  % SWA1_during_sleep = PhysioVars(sleep_epochs,3);
+  % SWA2_during_sleep = PhysioVars(sleep_epochs,4);
+  % SWA1_outliers_indices = find(SWA1_during_sleep>=(mean(SWA1_during_sleep)+3*std(SWA1_during_sleep)));
+  % SWA2_outliers_indices = find(SWA2_during_sleep>=(mean(SWA2_during_sleep)+3*std(SWA2_during_sleep)));
   
-  if strcmp(signal.name,'delta1') | strcmp(signal.name,'EEG1') 
-    PhysioVars(sleep_epochs(SWA1_outliers_indices),:)=[];
-    data(sleep_epochs(SWA1_outliers_indices),:)=[];
-    textdata(sleep_epochs(SWA1_outliers_indices),:)=[];
-    timestampvec{FileCounter}(sleep_epochs(SWA1_outliers_indices))=[];
-    EMG_data(sleep_epochs(SWA1_outliers_indices))=[];
-  end
+  % if strcmp(signal.name,'delta1') | strcmp(signal.name,'EEG1') 
+  %   PhysioVars(sleep_epochs(SWA1_outliers_indices),:)=[];
+  %   data(sleep_epochs(SWA1_outliers_indices),:)=[];
+  %   textdata(sleep_epochs(SWA1_outliers_indices),:)=[];
+  %   timestampvec{FileCounter}(sleep_epochs(SWA1_outliers_indices))=[];
+  %   EMG_data(sleep_epochs(SWA1_outliers_indices))=[];
+  % end
 
-  if strcmp(signal.name,'delta2') | strcmp(signal.name,'EEG2')
-    PhysioVars(SWA2_outliers_indices,:)=[];
-    data(SWA2_outliers_indices,:)=[];
-    textdata(SWA2_outliers_indices,:)=[];
-    timestampvec{FileCounter}(SWA2_outliers_indices)=[];
-    EMG_data(sleep_epochs(SWA2_outliers_indices))=[];
-  end 
+  % if strcmp(signal.name,'delta2') | strcmp(signal.name,'EEG2')
+  %   PhysioVars(SWA2_outliers_indices,:)=[];
+  %   data(SWA2_outliers_indices,:)=[];
+  %   textdata(SWA2_outliers_indices,:)=[];
+  %   timestampvec{FileCounter}(SWA2_outliers_indices)=[];
+  %   EMG_data(sleep_epochs(SWA2_outliers_indices))=[];
+  % end 
 
   %  % Uncomment these lines if you want to plot the histograms of delta activity during SWS
   %  [n1,x1]=hist(SWA1_during_sleep,linspace(0,max(SWA1_during_sleep),30));
@@ -486,37 +490,31 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
     elseif epoch_length_in_seconds < 10
       LactateSmoothed=medianfiltervectorized(data(:,1),2);
     end
-  PhysioVars(:,2) = LactateSmoothed;
-  PhysioVars(:,3) = medianfiltervectorized(PhysioVars(:,3),2); 
-  PhysioVars(:,4) = medianfiltervectorized(PhysioVars(:,4),2);
-  PhysioVars(:,5) = medianfiltervectorized(PhysioVars(:,5),2);  % Beta EEG1
-  PhysioVars(:,6) = medianfiltervectorized(PhysioVars(:,6),2);  % Beta EEG2
-  PhysioVars(:,7) = medianfiltervectorized(PhysioVars(:,7),2);  % custom frequency range
+  
+
+  EEG_data = medianfiltervectorized(EEG_data,2);
+
+
 
   if strcmp(model,'5state')
     % re-score wake epochs into quiet wake vs. active wake, based on EMG. Wake=0,SWS=1,REM=2,quiet wake=3, active wake=4
-    newstate = RescoreQuietVsActiveWake(PhysioVars(:,1),EMG_data,0.33,0.66,FileCounter,files);
+    newstate = RescoreQuietVsActiveWake(sleep_state,EMG_data,0.33,0.66,FileCounter,files);
     state_data{FileCounter} = newstate;
   end 
 
   if strcmp(model,'3state')
-    state_data{FileCounter} = PhysioVars(:,1);
+    state_data{FileCounter} = sleep_state;
   end
 
 
   if strcmp(signal.name,'lactate')
-    signal_data{FileCounter} = PhysioVars(:,2);
-  elseif strcmp(signal.name,'delta1') || strcmp(signal.name,'EEG1')
-    signal_data{FileCounter} = PhysioVars(:,3);
-  elseif strcmp(signal.name,'delta2') || strcmp(signal.name,'EEG2')
-    signal_data{FileCounter} = PhysioVars(:,4);
-  elseif strcmp(signal.name,'beta1') || strcmp(signal.name,'Beta1')
-    signal_data{FileCounter} = PhysioVars(:,5);
-  elseif strcmp(signal.name,'beta2') || strcmp(signal.name,'Beta2')
-    signal_data{FileCounter} = PhysioVars(:,6);
-  elseif strcmp(signal.name,'custom')
-    signal_data{FileCounter} = PhysioVars(:,7);
-  end
+    signal_data{FileCounter} = LactateSmoothed;
+  else
+    signal_data{FileCounter} = EEG_data;
+  end 
+
+
+
 
 
 % Remove all epochs of data where the lactate signal is negative (if using lactate as the signal)
@@ -697,6 +695,9 @@ for FileCounter=1:length(files)
   disp(['File number ', num2str(FileCounter), ' of ', num2str(length(files))])
   display(files{FileCounter})
   if strcmp(algorithm,'NelderMead')  
+    max(signal_data{1})
+    min(signal_data{1})
+    std(signal_data{1})
     [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal.name,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
   end
   if strcmp(algorithm,'BruteForce')
