@@ -37,7 +37,7 @@ function [Ti,Td,LA,UA,best_error,error_instant,best_S,ElapsedTime]=Franken_like_
 % in the last 4 hours of the baseline light period
 
 tic
-signal
+
 
 
 %window_length=4;  % size of moving window (in hours) used to compute
@@ -48,7 +48,7 @@ signal
 %% ---- Set up the time vector for lactate since you ignore data ------ %%
 %% ---- at the beginning and the end (due to the moving average) ------ %%
 % being careful to think about artifacts and allowing the sensor to settle down.  
-if strcmp(signal,'lactate')
+if strcmp(signal.name,'lactate')
   tL_start_time  = timestampvec(1) + hours(window_length/2);
   tL_end_time    = timestampvec(end) - hours(window_length/2);
   indices_start = find(timestampvec>=tL_start_time);  % this handles the case where the start time has been left out due to artifact
@@ -61,7 +61,7 @@ else
 end
 % make a frequency plot, and use it to figure out upper and lower
 % bounds for the model (like Franken et al. 2001 Figure 1)
-[LA,UA]=make_frequency_plot(datafile,window_length,signal,timestampvec,tL,epoch_length,0,0);
+[LA,UA]=make_frequency_plot(datafile,window_length,signal.name,timestampvec,tL,epoch_length,0,0);
 
 
 % -- if using delta power normalize UA and LA to mean SWS delta 
@@ -80,7 +80,7 @@ end
   % UAnormalized = (UA/mn)*100;   % upper asymptote normalized to mean delta power during SWS in last 4hr of baseline
 
 
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
+if strcmp(signal.name,'delta1') || strcmp(signal.name,'delta2') || strcmp(signal.name,'EEG1') || strcmp(signal.name,'EEG2') || strcmp(signal.name,'beta1') || strcmp(signal.name,'beta2')
   [t_mdpt_SWS,data_at_SWS_midpoints,t_mdpt_indices]=find_all_SWS_episodes5(datafile,timestampvec,epoch_length);
   % find and remove any NaNs 
   if sum(find(isnan(data_at_SWS_midpoints)))>0
@@ -91,7 +91,7 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   end
 
 
-disp(['Average ' signal ' power: ' num2str(mean(data_at_SWS_midpoints))])
+%disp(['Average ' signal.name ' power: ' num2str(mean(data_at_SWS_midpoints))])
 end
 
 % if using a moving window for the upper and lower assymptotes, S
@@ -106,7 +106,7 @@ end
 
 
 %mask=(window_length/2)*(60*60/epoch_length)+1:size(datafile,1)-(window_length/2)*(60*60/epoch_length);
-if strcmp(signal,'lactate')
+if strcmp(signal.name,'lactate')
   mask=find(timestampvec==tL(1)):find(timestampvec==tL(end));
 %disp(['recording length (after settling and artifacts): ' num2str(hours(timestampvec(end)-timestampvec(1)))])
 else
@@ -127,12 +127,12 @@ dt=min(dt);        % only want one value, not a vector. Take the minimum in case
 initial_guess_delta = [2 2];     % one starting guess
 initial_guess_lactate = [0.3 0.3];
 
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
-  [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,t_mdpt_indices,data_at_SWS_midpoints, ...
+if strcmp(signal.name,'delta1') || strcmp(signal.name,'delta2') || strcmp(signal.name,'EEG1') || strcmp(signal.name,'EEG2') || strcmp(signal.name,'beta1') || strcmp(signal.name,'beta2')
+  [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal.name,t_mdpt_indices,data_at_SWS_midpoints, ...
 								datafile,dt,(LA(1)+UA(1))/2,LA,UA,window_length,timestampvec,0,epoch_length,mask,p),initial_guess_delta,optimset('TolX',1e-3));
 end
 
-if strcmp(signal,'lactate')
+if strcmp(signal.name,'lactate')
 % set up the time vector for lactate since you ignore data at the beginning and the end (due to the moving average)
 % being careful to think about artifacts and allowing the sensor to settle down.  
   % tL_start_time  = timestampvec(1) + hours(window_length/2);
@@ -142,7 +142,7 @@ if strcmp(signal,'lactate')
   % tL = timestampvec(tL_start_index:tL_end_index);
   S_start_index = find(timestampvec==tL(1));
   S0 = datafile(S_start_index,2);  % lactate data 
-  [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal,0,0,datafile,dt,S0,LA,UA, ...
+  [bestparams,best_error] = fminsearch(@(p) myobjectivefunction(signal.name,0,0,datafile,dt,S0,LA,UA, ...
 								window_length,timestampvec,tL,epoch_length,mask,p),initial_guess_lactate,optimset('TolX',1e-3));
 end
 best_tau_i=bestparams(1);
@@ -153,12 +153,12 @@ Td=best_tau_d;
 
 
 % run one more time with best fit and plot it (with data points)
-if  strcmp(signal,'lactate')
+if  strcmp(signal.name,'lactate')
   best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,timestampvec,tL,epoch_length,filename);
   %error_instant=run_instant_model(datafile,LA,UA,window_length);
 error_instant = 0;
 end
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
+if strcmp(signal.name,'delta1') || strcmp(signal.name,'delta2') || strcmp(signal.name,'EEG1') || strcmp(signal.name,'EEG2') || strcmp(signal.name,'beta1') || strcmp(signal.name,'beta2')
  best_S=run_S_model(datafile,dt,(LA(1)+UA(1))/2,LA,UA,Ti,Td,window_length,0,timestampvec,tL,epoch_length,filename);
 end
 
@@ -170,8 +170,8 @@ disp(['ElapsedTime = ', num2str(ElapsedTime), ' seconds.'])
 %t=0:dt:dt*(size(datafile,1)-1);
 
 
-if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') || strcmp(signal,'EEG2') || strcmp(signal,'beta1') || strcmp(signal,'beta2')
-  error_instant=0;  % this won't get set if signal is delta, but the function returns it
+if strcmp(signal.name,'delta1') || strcmp(signal.name,'delta2') || strcmp(signal.name,'EEG1') || strcmp(signal.name,'EEG2') || strcmp(signal.name,'beta1') || strcmp(signal.name,'beta2')
+  error_instant=0;  % this won't get set if signal.name is delta, but the function returns it
   figure
   %only_sleep_indices=find(datafile(:,1)==1);  
   %sleep_eeg1=datafile(only_sleep_indices,3);
@@ -185,13 +185,13 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
   xmin = datenum(timestampvec(1));
   xmax = datenum(timestampvec(end));
   xlim([xmin xmax])
-  ylabel([signal ' power'])
+  ylabel([signal.name ' power'])
   xlabel('Time')
-  title(['Best fit of model to ' signal ' power data for file ' filename ' using ' num2str(epoch_length) '-second epochs and a ' model(1) '-state model' ])
+  title(['Best fit of model to ' signal.name ' power in ' num2str(signal.freq_range(1)) '-' num2str(signal.freq_range(2)) 'Hz range for file ' filename ' using ' num2str(epoch_length) '-second epochs and a ' model(1) '-state model' ])
   hold off
 
 
-  elseif strcmp(signal,'lactate')
+  elseif strcmp(signal.name,'lactate')
     figure
     %plot(t,datafile(:,2),'ro')
     only_sleep_indices = find(datafile(:,1)==1);

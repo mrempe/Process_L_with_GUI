@@ -66,8 +66,7 @@ if strcmp(signal,'delta1') || strcmp(signal,'delta2') || strcmp(signal,'EEG1') |
 
   xbins=linspace(0,max(sleepdata),30);
   
-xbins
-max(sleepdata)
+
 
   % compute the histograms
   [ns,xs]=hist(sleepdata,xbins);  %sleep data

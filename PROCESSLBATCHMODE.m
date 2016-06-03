@@ -45,21 +45,20 @@ if ~iscell(files), files = {files}; end
 
 
 
-prompt = {'Do you want to use delta power in channel 1 (EEG1), delta power in channel 2 (EEG2), beta1, beta2, or lactate?', ...
-'If not using lactate, which range of frequencies do you want to use to define SWA?  (write in the format ''1-4'')', ...
-'Do you want to use BruteForce or NelderMead?', ...
+prompt = {'Do you want to use EEG1, EEG2, or lactate as your signal?', ...
+'If using either EEG, which range of frequencies do you want to use to define SWA?  (write in the format ''1-4'')', ...
+'Do you want to use BruteForce or NelderMead to optimize the tau values?', ...
 'Do you want to rescore the data into Quiet Wake and Active Wake and use a 5-state model rather than a 3-state model?  (1 for yes, 0 for no)', ...
 'Do you want to restrict the data using hours from the beginning of the recording? (1 for yes, 0 for no)', ...
 'Do you want to restrict the data to be between two specific times? (1 for yes, 0 for no)', ...
 'Do you want to restrict the data using epochs from the beginning of the recording? (1 for yes, 0 for no)', ...
 'Would you like to write the optimal tau values to a file with a Data Source Info Tab? (1 for yes, 0 for no)'};
-defaults = {'EEG2','1-4','NelderMead','0','0','0','0','0'}; 
+defaults = {'EEG1','1-4','NelderMead','0','0','0','0','0'}; 
 dlg_title = 'Input';
 inputs = inputdlg(prompt,dlg_title,1,defaults,'on');
 
 
 signal.name = inputs{1};
-define_freq_range_yesno = str2double(inputs{2});
 [low_freq_bound,high_freq_bound] = strtok(inputs{2},'-');
 high_freq_bound = high_freq_bound(2:end);
 signal.freq_range(1) = str2num(low_freq_bound);
@@ -194,7 +193,7 @@ best_S = cell(length(files),1);
 % I will use each data set or not
 % --- 
 for FileCounter=1:length(files)  %this loop imports the data files one-by-one and processes the data in them into output files.   
-  clear PhysioVars EEG1 EEG2 EMG EMG_data M D H m s StartLine
+  clear  EEG1 EEG2 EMG EMG_data M D H m s StartLine
  
  
 
@@ -412,6 +411,7 @@ for FileCounter=1:length(files)  %this loop imports the data files one-by-one an
   elseif strcmp(signal.name,'EEG2')
     EEG_data = mean(data(:,EEG2_low_custom_column:EEG2_high_custom_column),2);
   end 
+
 
 
 
@@ -695,10 +695,7 @@ for FileCounter=1:length(files)
   disp(['File number ', num2str(FileCounter), ' of ', num2str(length(files))])
   display(files{FileCounter})
   if strcmp(algorithm,'NelderMead')  
-    max(signal_data{1})
-    min(signal_data{1})
-    std(signal_data{1})
-    [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal.name,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
+   [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model_with_nelder_mead([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length);
   end
   if strcmp(algorithm,'BruteForce')
     [Ti,Td,LA,UA,best_error,error_instant,S,ElapsedTime] = Franken_like_model([state_data{FileCounter} signal_data{FileCounter}],timestampvec{FileCounter},signal.name,files{FileCounter},model,epoch_length_in_seconds(FileCounter),window_length); %for brute-force 
